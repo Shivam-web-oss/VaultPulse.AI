@@ -24,6 +24,9 @@ venv.bak/
 *.sqlite3
 data_intelligence.db
 
+# Runtime task artifacts (dataset.json / ui.html generated per task)
+runtime/
+
 # Testing & Coverage
 .pytest_cache/
 .coverage
