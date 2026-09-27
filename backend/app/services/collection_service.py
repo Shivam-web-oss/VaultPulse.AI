@@ -1,10 +1,13 @@
 import json
+import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 from uuid import uuid4
 
+from app.db import connection
+from psycopg.types.json import Jsonb
 from app.schemas.collection import (
     Dataset,
     DatasetData,
@@ -15,12 +18,15 @@ from app.schemas.collection import (
     TaskStatus,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class CollectionTask:
     """In-memory collection task with filesystem artifact directories."""
 
-    def __init__(self, task_id: str, prompt: str, runtime_root: Path) -> None:
+    def __init__(self, task_id: str, prompt: str, runtime_root: Path, owner_id: str) -> None:
         self.id = task_id
+        self.owner_id = owner_id
         self.prompt = prompt
         self.status = TaskStatus.CREATED
         self.created_at = datetime.now(timezone.utc)
@@ -33,6 +39,22 @@ class CollectionTask:
         self.events: List[dict] = []
         self.cancel_requested = False
         self._lock = threading.Lock()
+
+    @classmethod
+    def from_row(cls, row: dict, runtime_root: Path) -> "CollectionTask":
+        task = cls(str(row["id"]), row["prompt"], runtime_root, str(row["owner_id"]))
+        task.status = TaskStatus(row["status"])
+        task.created_at = row["created_at"]
+        task.updated_at = row["updated_at"]
+        task.cancel_requested = row["cancel_requested"]
+        payload = row.get("dataset") or {}
+        if payload:
+            dataset = Dataset.model_validate(payload)
+            task.view = dataset.view
+            task.schema = dataset.schema_
+            task.items = dataset.data.items
+            task.provenance_entries = dataset.provenance.entries
+        return task
 
     @property
     def count(self) -> int:
@@ -48,16 +70,25 @@ class CollectionTask:
         }
         with self._lock:
             self.events.append(event)
+        with connection() as conn:
+            conn.execute("insert into collection_events (task_id, event, data) values (%s, %s, %s)", (self.id, event_type, Jsonb(event["data"])))
+            conn.commit()
+        logger.info("collection.event task_id=%s event=%s", self.id, event_type)
 
     def events_since(self, index: int) -> List[dict]:
-        with self._lock:
-            return list(self.events[index:])
+        with connection() as conn:
+            rows = conn.execute("select event, data, created_at from collection_events where task_id = %s order by id offset %s", (self.id, index)).fetchall()
+        return [{"event": row["event"], "data": row["data"], "at": row["created_at"].isoformat()} for row in rows]
 
     # -- state ---------------------------------------------------------------
 
     def set_status(self, status: TaskStatus) -> None:
         self.status = status
         self.updated_at = datetime.now(timezone.utc)
+        with connection() as conn:
+            conn.execute("update collection_tasks set status = %s, updated_at = %s where id = %s", (status.value, self.updated_at, self.id))
+            conn.commit()
+        logger.info("collection.status_changed task_id=%s status=%s", self.id, status.value)
 
     def is_terminal(self) -> bool:
         return self.status in (TaskStatus.COMPLETED, TaskStatus.PARTIAL, TaskStatus.FAILED, TaskStatus.CANCELLED)
@@ -69,6 +100,7 @@ class CollectionTask:
             self.items = records
             self.provenance_entries = entries
             self.updated_at = datetime.now(timezone.utc)
+            logger.info("collection.records_applied task_id=%s record_count=%s provenance_count=%s", self.id, len(records), len(entries))
 
     # -- dataset -------------------------------------------------------------
 
@@ -88,6 +120,9 @@ class CollectionTask:
             json.dumps(json.loads(self.dataset().model_dump_json(by_alias=True)), indent=2),
             encoding="utf-8",
         )
+        with connection() as conn:
+            conn.execute("update collection_tasks set dataset = %s, updated_at = %s where id = %s", (Jsonb(json.loads(self.dataset().model_dump_json(by_alias=True))), self.updated_at, self.id))
+            conn.commit()
 
 
 class CollectionService:
@@ -98,23 +133,37 @@ class CollectionService:
         self._lock = threading.Lock()
         self.runtime_root = Path(runtime_root) if runtime_root else Path("runtime") / "tasks"
 
-    def create(self, prompt: str) -> CollectionTask:
-        task = CollectionTask(str(uuid4()), prompt, self.runtime_root)
+    def create(self, prompt: str, owner_id: str) -> CollectionTask:
+        task = CollectionTask(str(uuid4()), prompt, self.runtime_root, owner_id)
         task.dir.mkdir(parents=True, exist_ok=True)
         with self._lock:
             self._tasks[task.id] = task
+        with connection() as conn:
+            conn.execute("insert into collection_tasks (id, owner_id, prompt, status) values (%s, %s, %s, %s)", (task.id, owner_id, prompt, task.status.value))
+            conn.commit()
         task.log_event("STATUS", {"taskId": task.id, "status": task.status.value})
         task.write_dataset()
+        logger.info("collection.created task_id=%s", task.id)
         return task
 
-    def get(self, task_id: str) -> Optional[CollectionTask]:
-        return self._tasks.get(task_id)
-
-    def cancel(self, task_id: str) -> bool:
+    def get(self, task_id: str, owner_id: str) -> Optional[CollectionTask]:
+        with connection() as conn:
+            row = conn.execute("select id, owner_id, prompt, status, created_at, updated_at, dataset, cancel_requested from collection_tasks where id = %s and owner_id = %s", (task_id, owner_id)).fetchone()
+        if row is None:
+            return None
         task = self._tasks.get(task_id)
+        if task is not None:
+            return task
+        return CollectionTask.from_row(row, self.runtime_root)
+
+    def cancel(self, task_id: str, owner_id: str) -> bool:
+        task = self.get(task_id, owner_id)
         if task is None or task.is_terminal():
             return False
         task.cancel_requested = True
+        with connection() as conn:
+            conn.execute("update collection_tasks set cancel_requested = true where id = %s and owner_id = %s", (task_id, owner_id))
+            conn.commit()
         task.set_status(TaskStatus.CANCELLED)
         task.log_event("STATUS", {"taskId": task.id, "status": TaskStatus.CANCELLED.value})
         return True

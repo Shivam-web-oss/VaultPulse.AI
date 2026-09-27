@@ -5,6 +5,7 @@ access. Record values are derived from the requirement so the same prompt
 always produces the same dataset, which keeps API contract tests stable.
 """
 
+from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
 from app.ai.requirement_analyzer import Requirement, SOURCE_CEILING
@@ -91,8 +92,6 @@ def collect(requirement: Requirement) -> Iterator[tuple[dict, ProvenanceEntry]]:
         )
 
 
-def _pseudo_timestamp(index: int) -> str:
-    from datetime import datetime, timedelta, timezone
-
+def _pseudo_timestamp(index: int) -> datetime:
     base = datetime.now(timezone.utc).replace(microsecond=0)
-    return (base - timedelta(minutes=index)).isoformat()
+    return base - timedelta(minutes=index)

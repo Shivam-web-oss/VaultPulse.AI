@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -9,6 +10,7 @@ from app.services.document_service import Document, document_service
 router = APIRouter(prefix="/upload", tags=["upload"], dependencies=[Depends(get_current_user)])
 ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "csv", "png", "jpg", "jpeg"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+logger = logging.getLogger(__name__)
 
 
 @router.post("")
@@ -30,6 +32,7 @@ def upload_file(file: UploadFile = File(...), current_user: AuthUser = Depends(g
         size=len(content),
         text=document_service.extract_text(file.filename or "", file.content_type or "", content),
     ))
+    logger.info("upload.completed document_id=%s user_id=%s size=%s extension=%s", document_id, current_user.id, len(content), extension)
 
     return {
         "id": document_id,

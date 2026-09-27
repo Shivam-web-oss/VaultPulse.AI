@@ -12,6 +12,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     ...options,
     headers,
   });
+  console.info('[api] response', { method: options.method || 'GET', path, status: response.status });
   if (response.status === 401) {
     clearAuth();
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('vaultpulse-auth-change'));

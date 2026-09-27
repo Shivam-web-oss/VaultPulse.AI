@@ -179,7 +179,22 @@ runtime/                           Task artifacts, gitignored (Phase A)
 
 ## Current Limitations
 
-The default chat provider is intentionally a replaceable mock service. User accounts, tokens, conversations, document indexes, and collection tasks are currently held in process memory, so restarting FastAPI clears them (the `runtime/tasks/<taskId>/` artifact files remain on disk). Use a database and durable token/session store before production deployment. The collection pipeline runs on LangGraph but still uses the deterministic fake collector and fake sources (real web collection arrives in Phase D). The fake source pool caps at 50 records, so requests above that end `PARTIAL` by design. Collection tasks and their event logs are held in process memory.
+The chat provider is currently unconfigured and returns an explicit error instead of fabricated assistant content. User accounts, tokens, conversations, document indexes, and collection tasks are currently held in process memory, so restarting FastAPI clears them (the `runtime/tasks/<taskId>/` artifact files remain on disk). Use a database and durable token/session store before production deployment. The collection pipeline runs on LangGraph but still uses the deterministic fake collector and fake sources for development (real web collection arrives in Phase D). The fake source pool caps at 50 records, so requests above that end `PARTIAL` by design. Collection tasks and their event logs are held in process memory.
+
+## Frontend Rules And Change Log
+
+The frontend is maintained as a separate project from `backend/`; project-specific workflow rules are in `codex.md`. Dashboard and chat screens render backend data or explicit loading, empty, and error states. They do not create mock conversations or fabricated assistant replies. API responses and conversation/message transitions log safe metadata such as paths, statuses, IDs, and counts; credentials, file contents, and full messages are never logged.
+
+### 2026-09-27
+
+| Change | Reason | Effected files |
+| --- | --- | --- |
+| Removed the local mock conversation and default `local-new` route. | Dashboard data must come from the backend. | `lib/conversationApi.ts`, `hooks/useConversation.ts`, `routes/index.ts` |
+| Replaced fabricated send-error messages with a visible error state. | Users must be able to distinguish unavailable data from an assistant response. | `hooks/useChat.ts`, `app/chat/[conversationId]/page.tsx` |
+| Display backend provider-unavailable errors instead of fabricated assistant content. | The dashboard must never present mock data as a real response. | `hooks/useChat.ts`, `app/chat/[conversationId]/page.tsx` |
+| Added safe API and state-transition logs. | Make data loading, creation, and message updates diagnosable. | `lib/api.ts`, `hooks/useConversation.ts`, `hooks/useChat.ts` |
+| Grouped conversations by their actual update date. | Prevent the same conversation from appearing in every sidebar section. | `components/layout/Sidebar.tsx` |
+| Displayed backend provider errors in the chat error state. | Make a `503` actionable instead of hiding its cause. | `hooks/useChat.ts` |
 
 ## Validation
 

@@ -2,7 +2,8 @@ import io
 import zipfile
 from dataclasses import dataclass
 from html import unescape
-from typing import Dict, List
+from typing import List
+from app.db import connection
 from xml.etree import ElementTree
 
 try:
@@ -22,19 +23,26 @@ class Document:
 
 
 class DocumentService:
-    def __init__(self) -> None:
-        self._documents: Dict[str, List[Document]] = {}
-
     def add(self, document: Document) -> Document:
-        self._documents.setdefault(document.owner_id, []).append(document)
+        with connection() as conn:
+            conn.execute(
+                "insert into documents (id, owner_id, name, content_type, size, text_content) values (%s, %s, %s, %s, %s, %s)",
+                (document.id, document.owner_id, document.name, document.content_type, document.size, document.text),
+            )
+            conn.commit()
         return document
 
     def search(self, owner_id: str, query: str) -> List[Document]:
-        documents = self._documents.get(owner_id, [])
         terms = [term.lower() for term in query.split() if len(term) > 2]
-        if not terms:
-            return documents
-        return [document for document in documents if any(term in document.text.lower() for term in terms)]
+        with connection() as conn:
+            if terms:
+                rows = conn.execute(
+                    "select id, owner_id, name, content_type, size, text_content from documents where owner_id = %s and text_content ilike any(%s)",
+                    (owner_id, [f"%{term}%" for term in terms]),
+                ).fetchall()
+            else:
+                rows = conn.execute("select id, owner_id, name, content_type, size, text_content from documents where owner_id = %s", (owner_id,)).fetchall()
+        return [Document(id=str(row["id"]), owner_id=str(row["owner_id"]), name=row["name"], content_type=row["content_type"], size=row["size"], text=row["text_content"]) for row in rows]
 
     @staticmethod
     def extract_text(filename: str, content_type: str, content: bytes) -> str:

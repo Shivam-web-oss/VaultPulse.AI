@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class TaskStatus(str, Enum):
@@ -17,6 +17,14 @@ class TaskStatus(str, Enum):
 class CollectionCreateRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
 
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("prompt must contain non-whitespace characters")
+        return normalized
+
 
 class CollectionCreatedResponse(BaseModel):
     taskId: str
@@ -28,6 +36,14 @@ class SchemaField(BaseModel):
     type: str = Field(min_length=1, max_length=40)
     label: str = Field(min_length=1, max_length=120)
 
+    @field_validator("key", "type", "label")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("schema field values must contain non-whitespace characters")
+        return normalized
+
 
 class DatasetSchema(BaseModel):
     name: str = Field(min_length=1, max_length=80)
@@ -36,12 +52,18 @@ class DatasetSchema(BaseModel):
 
 
 class DatasetData(BaseModel):
-    count: int = 0
+    count: int = Field(default=0, ge=0)
     items: list[dict[str, Any]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_count(self):
+        if self.count != len(self.items):
+            raise ValueError("data.count must equal the number of data.items")
+        return self
 
 
 class ProvenanceEntry(BaseModel):
-    recordIndex: int
+    recordIndex: int = Field(ge=0)
     sourceUrl: str
     sourceName: str
     retrievedAt: datetime

@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +18,7 @@ from app.services.collection_service import collection_service
 from app.workflow import executor
 
 router = APIRouter(prefix="/v1/collections", tags=["collections"])
+logger = logging.getLogger(__name__)
 
 
 def _status_response(task) -> CollectionStatusResponse:
@@ -32,16 +34,17 @@ def _status_response(task) -> CollectionStatusResponse:
 
 @router.post("", response_model=CollectionCreatedResponse, status_code=201)
 def create_collection(payload: CollectionCreateRequest, current_user: AuthUser = Depends(get_current_user)):
-    task = collection_service.create(payload.prompt)
+    task = collection_service.create(payload.prompt, current_user.id)
     # Report the creation status, not whatever the executor has already moved to.
     response = CollectionCreatedResponse(taskId=task.id, status=task.status)
     executor.start(task)
+    logger.info("collection.request_started task_id=%s user_id=%s", task.id, current_user.id)
     return response
 
 
 @router.get("/{task_id}", response_model=CollectionStatusResponse)
 def get_collection(task_id: str, current_user: AuthUser = Depends(get_current_user)):
-    task = collection_service.get(task_id)
+    task = collection_service.get(task_id, current_user.id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return _status_response(task)
@@ -49,7 +52,7 @@ def get_collection(task_id: str, current_user: AuthUser = Depends(get_current_us
 
 @router.get("/{task_id}/result", response_model=CollectionResultResponse)
 def get_result(task_id: str, current_user: AuthUser = Depends(get_current_user)):
-    task = collection_service.get(task_id)
+    task = collection_service.get(task_id, current_user.id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -66,7 +69,7 @@ def get_result(task_id: str, current_user: AuthUser = Depends(get_current_user))
 
 @router.get("/{task_id}/events")
 def stream_events(task_id: str, current_user: AuthUser = Depends(get_current_user)):
-    task = collection_service.get(task_id)
+    task = collection_service.get(task_id, current_user.id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -86,7 +89,7 @@ def stream_events(task_id: str, current_user: AuthUser = Depends(get_current_use
 
 @router.get("/{task_id}/export")
 def export_dataset(task_id: str, format: str = "json", current_user: AuthUser = Depends(get_current_user)):
-    task = collection_service.get(task_id)
+    task = collection_service.get(task_id, current_user.id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     if format != "json":
@@ -100,7 +103,7 @@ def export_dataset(task_id: str, format: str = "json", current_user: AuthUser = 
 
 @router.get("/{task_id}/ui")
 def get_ui(task_id: str, current_user: AuthUser = Depends(get_current_user)):
-    task = collection_service.get(task_id)
+    task = collection_service.get(task_id, current_user.id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     ui_path = collection_service.ui_path(task_id)
@@ -111,8 +114,8 @@ def get_ui(task_id: str, current_user: AuthUser = Depends(get_current_user)):
 
 @router.post("/{task_id}/cancel", response_model=CancelResponse)
 def cancel_collection(task_id: str, current_user: AuthUser = Depends(get_current_user)):
-    cancelled = collection_service.cancel(task_id)
-    task = collection_service.get(task_id)
+    cancelled = collection_service.cancel(task_id, current_user.id)
+    task = collection_service.get(task_id, current_user.id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return CancelResponse(taskId=task_id, status=task.status, cancelled=cancelled)

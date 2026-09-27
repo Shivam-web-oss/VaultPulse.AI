@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { createConversation, getConversations } from '../lib/chatApi';
-import { mockConversation } from '../lib/conversationApi';
 import type { Conversation } from '../types/conversation';
 
 export function useConversation(initialConversationId?: string) {
@@ -12,6 +11,7 @@ export function useConversation(initialConversationId?: string) {
   useEffect(() => {
     let cancelled = false;
     getConversations().then(async (items) => {
+      console.info('[conversation] loaded', { count: items.length, requestedId: initialConversationId ?? null });
       if (initialConversationId && items.some((item) => item.id === initialConversationId)) {
         if (!cancelled) {
           setConversations(items);
@@ -26,13 +26,14 @@ export function useConversation(initialConversationId?: string) {
           if (!cancelled) {
             setConversations([conversation]);
             setSelectedId(conversation.id);
+            console.info('[conversation] created initial conversation', { conversationId: conversation.id });
           }
           return;
         } catch {
-          // Backend unavailable: fall back to the local mock conversation.
+          console.error('[conversation] failed to create initial conversation');
           if (!cancelled) {
-            setConversations([mockConversation]);
-            setSelectedId(mockConversation.id);
+            setConversations([]);
+            setSelectedId(null);
           }
           return;
         }
@@ -42,9 +43,10 @@ export function useConversation(initialConversationId?: string) {
         setSelectedId(items[0].id);
       }
     }).catch(() => {
+      console.error('[conversation] failed to load conversations');
       if (!cancelled) {
-        setConversations([mockConversation]);
-        setSelectedId(mockConversation.id);
+        setConversations([]);
+        setSelectedId(null);
       }
     });
     return () => {
@@ -59,10 +61,9 @@ export function useConversation(initialConversationId?: string) {
       const conversation = await createConversation();
       setConversations((current) => [conversation, ...current]);
       setSelectedId(conversation.id);
+      console.info('[conversation] created conversation', { conversationId: conversation.id });
     } catch {
-      const local = { ...mockConversation, id: `local-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      setConversations((current) => [local, ...current]);
-      setSelectedId(local.id);
+      console.error('[conversation] failed to create conversation');
     }
   };
 
