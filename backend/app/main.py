@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from app.routes.chat import router as chat_router
+from app.routes.collections import router as collections_router
 from app.routes.conversations import router as conversations_router
 from app.routes.upload import router as upload_router
 from app.routes.auth import router as auth_router
@@ -21,6 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(conversations_router, prefix="/api")
+app.include_router(collections_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")

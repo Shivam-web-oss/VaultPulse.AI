@@ -10,13 +10,46 @@ export function useConversation(initialConversationId?: string) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    getConversations().then((items) => {
-      setConversations(items);
-      setSelectedId(initialConversationId && items.some((item) => item.id === initialConversationId) ? initialConversationId : items[0]?.id ?? null);
+    let cancelled = false;
+    getConversations().then(async (items) => {
+      if (initialConversationId && items.some((item) => item.id === initialConversationId)) {
+        if (!cancelled) {
+          setConversations(items);
+          setSelectedId(initialConversationId);
+        }
+        return;
+      }
+      if (items.length === 0) {
+        // No conversations yet: create one so the composer has an active target to send to.
+        try {
+          const conversation = await createConversation();
+          if (!cancelled) {
+            setConversations([conversation]);
+            setSelectedId(conversation.id);
+          }
+          return;
+        } catch {
+          // Backend unavailable: fall back to the local mock conversation.
+          if (!cancelled) {
+            setConversations([mockConversation]);
+            setSelectedId(mockConversation.id);
+          }
+          return;
+        }
+      }
+      if (!cancelled) {
+        setConversations(items);
+        setSelectedId(items[0].id);
+      }
     }).catch(() => {
-      setConversations([mockConversation]);
-      setSelectedId(mockConversation.id);
+      if (!cancelled) {
+        setConversations([mockConversation]);
+        setSelectedId(mockConversation.id);
+      }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [initialConversationId]);
 
   const active = conversations.find((item) => item.id === selectedId) ?? null;

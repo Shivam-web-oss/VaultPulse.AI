@@ -1,6 +1,6 @@
 # VaultPulse.AI
 
-VaultPulse.AI is a secure, responsive workspace for chatting with an assistant and searching the full text of uploaded documents. The project has a Next.js frontend and a FastAPI backend. Authentication is shared through React Context, while the API enforces bearer authentication and user-owned data access.
+VaultPulse.AI is a secure, responsive workspace for chatting with an assistant and searching the full text of uploaded documents, growing into an AI-powered data intelligence platform that turns natural-language requests into verified structured datasets. The project has a Next.js frontend and a FastAPI backend. Authentication is shared through React Context, while the API enforces bearer authentication and user-owned data access.
 
 ## Run Locally
 
@@ -63,8 +63,54 @@ Protected endpoints require `Authorization: Bearer <access_token>`:
 | `POST` | `/api/chat/{id}/messages` | `{ message }` | Searches the user's indexed documents and returns an assistant message. |
 | `POST` | `/api/chat/{id}/stream` | `{ message }` | Streams an assistant response as server-sent events. |
 | `POST` | `/api/upload` | Multipart `file` | Extracts and indexes TXT, CSV, DOCX, and PDF content for the current user. |
+| `POST` | `/api/v1/collections` | `{ prompt }` | Creates a data collection task and starts the pipeline in a background thread. Returns `{ taskId, status: "CREATED" }`. |
+| `GET` | `/api/v1/collections/{taskId}` | None | Gets task status, prompt, and record count. |
+| `GET` | `/api/v1/collections/{taskId}/result` | None | Gets the full dataset response: request, dataset, UI metadata, provenance, files. |
+| `GET` | `/api/v1/collections/{taskId}/events` | None | Server-sent events stream of live pipeline progress (`PLANNING`, `SEARCHING`, `RECORDS_FOUND`, `VALIDATING`, `DEDUPLICATING`, `COMPLETED`/`PARTIAL`). |
+| `GET` | `/api/v1/collections/{taskId}/export?format=json` | None | Downloads the `dataset.json` artifact (other formats return 400 for now). |
+| `GET` | `/api/v1/collections/{taskId}/ui` | None | Downloads the generated `ui.html` artifact (404 until Phase F). |
+| `POST` | `/api/v1/collections/{taskId}/cancel` | None | Cancels a task; rejected for terminal states (`COMPLETED`, `FAILED`, `CANCELLED`). |
 
 Uploads are limited to 10 MB. Supported extensions are `pdf`, `docx`, `txt`, `csv`, `png`, `jpg`, and `jpeg`; text extraction is available for PDF, DOCX, TXT, and CSV. Image uploads are accepted and stored as metadata, but OCR is not enabled yet.
+
+## Backend Structure (pipeline modules)
+
+```text
+backend/app/
+├── ai/state.py                  CollectionState TypedDict with append reducers (Phase C)
+├── ai/graph.py                  LangGraph StateGraph: 12 nodes + conditional loop (Phase C)
+├── ai/planner.py                Requirement → multi-round source/tool plan (Phase C)
+├── ai/requirement_analyzer.py   Prompt → entity, count, constraints, schema (Phase B)
+├── ai/fake_collector.py         Deterministic record generation, no network (Phase B)
+├── tools/registry.py            WebSearchTool / PageExtractionTool / HttpFetchTool (Phase C)
+├── tools/source_policy.py       Permitted-source allowlist (Phase C)
+├── processing/quality.py        Deterministic validation + deduplication (§14)
+└── workflow/executor.py         Runs the graph per task, emits SSE events per node
+```
+
+## AI Data Intelligence Platform
+
+A prompt-driven pipeline converts a natural-language requirement into a fresh, verified, structured dataset (`dataset.json`, the source of truth) and an AI-generated HTML UI for it. Two AI responsibilities are kept separate: a LangGraph workflow owns data collection/quality (implemented as a `StateGraph` in `app/ai/graph.py`: analyzer → planner → tool selector → source selection → search → pages → extract → normalize → validate → dedupe, looping back to search until the target count is met or sources are exhausted), and a UI-specialized model owns presentation only. Records are never fabricated — if sources run out, the task ends `PARTIAL`. UI generation failure never fails the task; the React fallback renders the dataset.
+
+Task lifecycle:
+
+```text
+CREATED → RUNNING → COMPLETED | PARTIAL | FAILED
+                \→ CANCELLED (from any non-terminal state)
+```
+
+Phase progress (update this table whenever a phase is implemented):
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| A — Contracts | FastAPI task lifecycle, Pydantic dataset contracts, `/api/v1/collections` endpoints, `runtime/tasks/<taskId>/` artifacts | ✅ Done |
+| B — Fake pipeline | Requirement analyzer, fake collector, schema + records into `dataset.json`, `COMPLETED`/`PARTIAL` transitions, SSE progress events, background executor | ✅ Done |
+| C — LangGraph | `CollectionState` graph (§11), workflow planner, tool registry with source policy, conditional collection loop with exhausted→`PARTIAL` path | ✅ Done |
+| D — Real collection | Web search, browser navigation, extraction tools | ⬜ Not started |
+| E — Data quality | Normalization, validation, deduplication, provenance | ⬜ Not started |
+| F — UI generation | UI-specialized model produces `ui.html` from dataset + schema | ⬜ Not started |
+| G — UI safety | Artifact validation, sandboxing, React fallback renderer | ⬜ Not started |
+| H — React panel | Prompt input, progress UI, generated-UI container, filters, export | ⬜ Not started |
 
 ## Frontend Structure
 
@@ -106,11 +152,19 @@ backend/
 ├── app/main.py                    FastAPI application and CORS
 ├── app/dependencies/auth.py      Bearer-token dependency
 ├── app/routes/                    HTTP route modules
+├── app/routes/collections.py     /api/v1/collections task endpoints (Phase A)
 ├── app/schemas/                   Pydantic request and response models
+├── app/schemas/collection.py     Dataset contract, task status enum (Phase A)
 ├── app/services/auth_service.py  Password hashing and token sessions
 ├── app/services/conversation_service.py
+├── app/services/collection_service.py  In-memory task store + runtime artifacts (Phase A)
 ├── app/services/document_service.py  Per-user document extraction/index
 └── app/services/chat_service.py  Assistant provider boundary
+
+runtime/                           Task artifacts, gitignored (Phase A)
+└── tasks/<taskId>/
+    ├── dataset.json               Dataset source of truth, written on task creation
+    └── ui.html                    Generated UI artifact (arrives in Phase F)
 ```
 
 ## State And Data Flow
@@ -125,7 +179,7 @@ backend/
 
 ## Current Limitations
 
-The default chat provider is intentionally a replaceable mock service. User accounts, tokens, conversations, and document indexes are currently held in process memory, so restarting FastAPI clears them. Use a database and durable token/session store before production deployment.
+The default chat provider is intentionally a replaceable mock service. User accounts, tokens, conversations, document indexes, and collection tasks are currently held in process memory, so restarting FastAPI clears them (the `runtime/tasks/<taskId>/` artifact files remain on disk). Use a database and durable token/session store before production deployment. The collection pipeline runs on LangGraph but still uses the deterministic fake collector and fake sources (real web collection arrives in Phase D). The fake source pool caps at 50 records, so requests above that end `PARTIAL` by design. Collection tasks and their event logs are held in process memory.
 
 ## Validation
 
