@@ -27,6 +27,16 @@ The app runs at `http://localhost:3000`.
 
 Set `NEXT_PUBLIC_API_URL` in `.env.local` when the backend is not running at `http://localhost:8000`. Use `.env.example` as the template. Never commit secrets.
 
+## Deploy To Vercel
+
+Create a Vercel project from this repository with the project root set to `frontend`. Vercel detects Next.js automatically. Add this production environment variable before deploying:
+
+```text
+NEXT_PUBLIC_API_URL=https://your-backend-domain.example.com
+```
+
+The backend URL must include the scheme, must not end with `/`, and must allow the deployed frontend origin in its `CORS_ORIGINS` setting.
+
 ## Routing
 
 All frontend route constants are defined in `routes/index.ts`.

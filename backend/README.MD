@@ -14,6 +14,22 @@ uvicorn app.main:app --reload
 
 The API runs at `http://localhost:8000`. Set `LOG_LEVEL` to control backend console logging; it defaults to `INFO`.
 
+## Deploy To Vercel
+
+The FastAPI app has a Vercel entrypoint at `api/index.py`. Create a separate Vercel project from this repository with the project root set to `backend`; Vercel will detect the Python function from that file. Configure these environment variables in the Vercel project:
+
+```text
+DATABASE_URL=your-production-postgresql-url
+CORS_ORIGINS=https://your-frontend-domain.vercel.app
+AI_PROVIDER_API_KEY=your-key
+AI_PROVIDER_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+AI_MODEL=gemini-2.5-flash
+```
+
+Deploy the backend first, set `NEXT_PUBLIC_API_URL` in the frontend Vercel project to the backend URL, then deploy the frontend. Do not put secrets in `NEXT_PUBLIC_*` variables.
+
+Vercel functions are stateless and request-limited. The chat and document routes are suitable for this entrypoint, but collection jobs currently use background threads, SSE, and local `runtime/tasks` files. Run those workflows on a persistent backend host or migrate them to a durable queue and object storage before relying on collections in production.
+
 Set `DATABASE_URL` to the Supabase Postgres connection string from Project Settings -> Database. Use the URI exactly as Supabase provides it, including `sslmode=require`; do not leave bracket placeholders or use an unresolvable host. On startup, the backend applies the idempotent `migrations/001_initial.sql` migration and uses a bounded `psycopg` connection pool. The frontend does not connect to Supabase directly.
 
 ## Chat Provider
