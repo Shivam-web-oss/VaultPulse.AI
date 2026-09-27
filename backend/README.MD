@@ -1,4 +1,26 @@
-The chat endpoint does not fabricate assistant content. Until a real AI provider is configured, chat requests return HTTP `503` with a provider-unavailable error, which the frontend displays as an error state. The collection workflow still contains a deterministic fake collector for development pipeline work; it must not be presented as production dashboard data.
+The chat endpoint does not fabricate assistant content. Until a real AI provider is configured, chat requests return HTTP `503` with a provider-unavailable error, which the frontend displays as an error state.
+
+## Data Collection (Phase D — Real Sources)
+
+The collection workflow fetches real records from an explicit allow-list of permitted sources. The deterministic fake collector has been removed.
+
+**Permitted sources** (each verified for robots.txt compliance and terms of use):
+
+| Domain | Entity | Kind | Rate limit |
+| --- | --- | --- | --- |
+| `books.toscrape.com` | product | static HTML (scraping sandbox) | 0.5 req/s |
+| `www.arbeitnow.com` | job | keyless public job-board API | 0.5 req/s |
+| `hn.algolia.com` | record | official Hacker News Search API | 1 req/s |
+
+**Policy enforcement** — every outbound request goes through `app/tools/fetcher.py`, which refuses any domain not on the allow-list in `app/tools/source_policy.py`, fetches and caches each domain's `robots.txt` (1 hour TTL; a `403` robots response blocks the whole domain), consumes one token from a per-domain token bucket before fetching, and stamps results with the real retrieval timestamp. `ProvenanceEntry.sourceUrl` and `retrievedAt` now come from actual HTTP responses.
+
+**Pipeline** — the planner over-fetches raw records (2x the requested count, capped at 8 rounds) because validation drops records that fail constraints such as price caps; the search → extract → validate → deduplicate loop repeats until enough valid records exist or the source runs dry, then reports `COMPLETED` or `PARTIAL` — it never fabricates records to fill a gap. Search prompts are reduced to clean search terms before hitting search APIs.
+
+**No browser automation** — all permitted sources are static HTML or JSON APIs, so the pipeline uses `httpx` + `beautifulsoup4` only. Playwright is intentionally not included. JS-gated pages (e.g. `python.org/events`) were evaluated and rejected for this reason.
+
+**Adding a source** — add the domain to `PERMITTED_SOURCES` in `app/tools/source_policy.py` with its entity, kind (`html` or `api`), and rate limit; verify its `robots.txt` actually permits collection first; then add an adapter in `app/tools/sources.py` and register its planning capacity in `app/tools/registry.py`.
+
+Set `COLLECTOR_USER_AGENT` (see `.env.example`) to control the User-Agent sent by the collector; `robots.txt` is evaluated for this agent.
 # VaultPulse.AI Backend
 
 The backend is a separate FastAPI project. It owns authentication, API contracts, validation, user data access, document indexing, chat, and collection task state. Frontend-specific rules live in `../frontend/codex.md`; backend rules live in `codex.md`.
@@ -44,3 +66,13 @@ Pydantic schemas reject whitespace-only messages, prompts, and titles, normalize
 | Added lifecycle logging for conversations, chat, uploads, and collections. | Trace every important data/state update without exposing sensitive data. | `app/main.py`, `app/routes/`, `app/services/` |
 | Added an OpenAI-compatible provider adapter. | Return real assistant responses when configured, without mock data. | `app/services/chat_service.py`, `.env.example` |
 | Added Supabase Postgres persistence for users, sessions, conversations, messages, documents, and collection tasks/events. | Prevent data loss on backend restart and enforce database ownership constraints. | `app/db.py`, `migrations/001_initial.sql`, `app/services/`, `app/routes/collections.py`, `requirements.txt` |
+
+### 2026-09-28
+
+| Change | Reason | Effected files |
+| --- | --- | --- |
+| Replaced the deterministic fake collector with real permitted sources (scraping sandbox + keyless public APIs). | Phase D: collection results and provenance must reflect real HTTP responses, not synthetic data. | `app/tools/registry.py`, `app/tools/sources.py`, `app/tools/fetcher.py`, `app/ai/graph.py` |
+| Added a real source policy: explicit domain allow-list, robots.txt fetch/cache/enforcement, per-domain token-bucket rate limits. | Respect terms, access restrictions, and rate limits before any fetch. | `app/tools/source_policy.py`, `app/tools/fetcher.py` |
+| Added over-fetch planning and count capping; clean search-term extraction from prompts. | Validation drops failing records, so plan raw volume above target and deliver exactly what was requested. | `app/ai/planner.py`, `app/ai/requirement_analyzer.py`, `app/workflow/executor.py` |
+| Removed the fake collector and its source ceiling. | Fake source keys and synthetic provenance are no longer part of the pipeline. | `app/ai/fake_collector.py` (deleted), `app/ai/requirement_analyzer.py` |
+| Added `httpx` and `beautifulsoup4`; no Playwright. | All permitted sources are static HTML or JSON APIs; browser automation is unnecessary and heavy. | `requirements.txt` |
