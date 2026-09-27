@@ -18,16 +18,16 @@ Set `DATABASE_URL` to the Supabase Postgres connection string from Project Setti
 
 ## Chat Provider
 
-Chat uses an OpenAI-compatible HTTP API. Copy these settings into `backend/.env`, set a real API key, then restart FastAPI:
+Chat uses an OpenAI-compatible HTTP API. The API key can come from any service that supports this request and response format. `AI_PROVIDER` is only an optional label; the endpoint determines compatibility. Copy these settings into `backend/.env`, set a real API key, then restart FastAPI:
 
 ```text
-AI_PROVIDER=openai-compatible
+AI_PROVIDER=
 AI_PROVIDER_API_KEY=your-key
 AI_PROVIDER_BASE_URL=https://api.openai.com/v1/chat/completions
 AI_MODEL=gpt-4o-mini
 ```
 
-A missing key or unsupported provider returns `503`; the backend never creates a fabricated assistant response.
+A missing key or unreachable/incompatible endpoint returns `503`; the backend never creates a fabricated assistant response. Native provider keys that do not support the OpenAI-compatible format still require a provider-specific adapter.
 
 ## Validation And Logging
 

@@ -15,10 +15,6 @@ class ChatService:
     provider_name = "unconfigured"
 
     def generate_reply(self, message: str, documents: Sequence[Document] = ()) -> str:
-        provider_name = os.getenv("AI_PROVIDER", "unconfigured").strip().lower()
-        if provider_name not in {"openai", "openai-compatible"}:
-            raise ChatProviderUnavailableError("Set AI_PROVIDER=openai-compatible and configure AI_PROVIDER_API_KEY")
-
         api_key = os.getenv("AI_PROVIDER_API_KEY", "").strip()
         if not api_key:
             raise ChatProviderUnavailableError("AI_PROVIDER_API_KEY is not configured")
