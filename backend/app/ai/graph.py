@@ -10,11 +10,12 @@ UI generation is Phase F and is intentionally not a node yet.
 """
 
 import time
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import List
 
 from langgraph.graph import END, START, StateGraph
 
-from app.ai import fake_collector
 from app.ai.planner import plan
 from app.ai.requirement_analyzer import Requirement, analyze
 from app.ai.state import CollectionState
@@ -22,7 +23,7 @@ from app.processing import quality
 from app.schemas.collection import ProvenanceEntry
 from app.tools import registry
 
-MAX_ROUNDS = 6
+MAX_ROUNDS = 10
 
 
 def _requirement(state: CollectionState) -> Requirement:
@@ -32,6 +33,7 @@ def _requirement(state: CollectionState) -> Requirement:
         count=state["requirement"]["count"],
         constraints=state["requirement"]["constraints"],
         schema=state["requirement"].get("_schema"),
+        search_terms=state["requirement"].get("searchTerms", ""),
     )
 
 
@@ -46,6 +48,7 @@ def requirement_analyzer(state: CollectionState) -> dict:
             "entityLabel": requirement.entity_label,
             "count": requirement.count,
             "constraints": requirement.constraints,
+            "searchTerms": requirement.search_terms,
             "_schema": requirement.schema,
         },
         "target_count": requirement.count,
@@ -74,12 +77,12 @@ def source_selection(state: CollectionState) -> dict:
 
 
 def search(state: CollectionState) -> dict:
-    _requirement(state)  # validates state shape
+    requirement = _requirement(state)  # validates state shape
     round_index = state["round"]
     rounds = state["workflow"]["rounds"]
     round_plan = rounds[round_index % len(rounds)]
     tool = registry.REGISTRY[round_plan["tool"]]
-    result = tool.run(state["prompt"], _requirement(state), round_plan["source"], round_plan.get("offset", 0))
+    result = tool.run(requirement.search_terms, _requirement(state), round_plan["source"], round_plan.get("offset", 0))
     return {
         "raw_evidence": [{
             "round": round_index + 1,
@@ -87,6 +90,8 @@ def search(state: CollectionState) -> dict:
             "source": round_plan["source"],
             "capacity": result.get("capacity"),
             "permitted": result.get("permitted", True),
+            "candidates": len(result.get("results", [])),
+            "error": result.get("error"),
         }],
         "round": round_index + 1,
     }
@@ -98,17 +103,24 @@ def open_pages(state: CollectionState) -> dict:
 
 
 def extract(state: CollectionState) -> dict:
+    requirement = _requirement(state)
     round_plan = state["workflow"]["rounds"][(state["round"] - 1) % len(state["workflow"]["rounds"])]
     # Deterministic paging: advance the slice by how much earlier rounds took.
-    prior_rounds = state["workflow"]["rounds"][: state["round"] - 1]
-    offset = sum(r["take"] for r in prior_rounds)
-    sliced = list(fake_collector.collect(_requirement(state)))[offset: offset + round_plan["take"]]
+    offset = sum(r["take"] for r in state["workflow"]["rounds"][: state["round"] - 1])
+    tool_requirement = replace(requirement, count=round_plan["take"])
+    result = registry.EXTRACT_TOOL.run(requirement.search_terms, tool_requirement, round_plan["source"], offset)
     records: List[dict] = []
     entries: List[ProvenanceEntry] = []
-    for index, (record, entry) in enumerate(sliced):
-        entry.recordIndex = offset + index
-        records.append(record)
-        entries.append(entry)
+    for item in result.get("items", []):
+        record = dict(item.get("record", {}))
+        provenance = item.get("provenance", {})
+        records.append({k: v for k, v in record.items() if not str(k).startswith("_")})
+        entries.append(ProvenanceEntry(
+            recordIndex=len(records) - 1,
+            sourceUrl=str(provenance.get("sourceUrl", record.get("url", ""))),
+            sourceName=str(provenance.get("sourceName", "")),
+            retrievedAt=provenance.get("retrievedAt") or datetime.now(timezone.utc),
+        ))
     return {"extracted_records": records, "provenance_entries": entries}
 
 

@@ -1,7 +1,12 @@
+import logging
 import re
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from app.schemas.collection import DatasetSchema, SchemaField
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -11,6 +16,7 @@ class Requirement:
     count: int
     constraints: dict
     schema: DatasetSchema
+    search_terms: str = ""
 
 
 FIELD_TEMPLATES: dict[str, list[SchemaField]] = {
@@ -52,8 +58,6 @@ ENTITY_KEYWORDS = {
 
 DEFAULT_COUNT = 20
 MAX_COUNT = 200
-# Fake sources run out below this ceiling, which exercises the PARTIAL path.
-SOURCE_CEILING = 50
 
 
 def _detect_entity(prompt: str) -> str:
@@ -93,7 +97,31 @@ def _requested_fields(prompt: str, fields: list[SchemaField]) -> list[SchemaFiel
     return selected + [field for field in link_fields if field not in selected] or fields
 
 
-def analyze(prompt: str) -> Requirement:
+_SEARCH_STOPWORDS = re.compile(
+    r"\b(?:find|get|show|list|collect|give|me|the|a|an|about|for|from|with|top|latest|"
+    r"articles?|news|records?|items?|entries?|pages?|products?|jobs?|events?|under|below|less|than|in)\b|\d+",
+    re.IGNORECASE,
+)
+
+
+def _extract_search_terms(prompt: str) -> str:
+    """Reduce the prompt to the topic words worth sending to a search API.
+
+    Deterministic and independent of which requirement analyzer (LLM or
+    regex) determined the entity/schema -- both paths call this on the same
+    raw prompt, so search terms never disagree with which analyzer ran.
+    """
+    cleaned = _SEARCH_STOPWORDS.sub(" ", prompt)
+    terms = " ".join(cleaned.split())
+    return terms[:200]
+
+
+def _analyze_regex(prompt: str) -> Requirement:
+    """Deterministic keyword/regex analysis (Phase C). Kept as the fallback
+
+    path for when the LLM analyzer is unconfigured, unreachable, or returns
+    output that fails validation -- see `analyze()` below.
+    """
     entity = _detect_entity(prompt)
     fields = FIELD_TEMPLATES.get(entity, FIELD_TEMPLATES["record"])
     return Requirement(
@@ -102,4 +130,44 @@ def analyze(prompt: str) -> Requirement:
         count=_extract_count(prompt),
         constraints=_extract_constraints(prompt),
         schema=DatasetSchema(name=entity, version="1.0", fields=_requested_fields(prompt, fields)),
+        search_terms=_extract_search_terms(prompt),
+    )
+
+
+def analyze(prompt: str) -> Requirement:
+    """Understand a natural-language data request (Phase D.5, doc SS11/SS12).
+
+    Tries the LLM-based analyzer first, which can understand arbitrary
+    entities and propose their own field schema rather than being limited to
+    the hardcoded product/job/event templates below. Any failure -- provider
+    unconfigured or unreachable, non-JSON output, or output that fails the
+    field-type/field-count/record-count validation in
+    `app.ai.llm_requirement_analyzer` -- falls back to the deterministic
+    regex analyzer so the pipeline always produces a usable requirement.
+
+    `search_terms` is always derived deterministically from the raw prompt
+    (Phase D's clean-search-term step), regardless of which analyzer path
+    ran, so the search API query never disagrees with how the requirement
+    was understood.
+    """
+    search_terms = _extract_search_terms(prompt)
+
+    try:
+        from app.ai.llm_requirement_analyzer import LLMUnavailableError, analyze_with_llm
+
+        result = analyze_with_llm(prompt)
+    except (LLMUnavailableError, ValidationError) as error:
+        logger.info("requirement_analyzer.llm_fallback reason=%s: %s", type(error).__name__, error)
+        return _analyze_regex(prompt)
+    except Exception as error:  # noqa: BLE001 - this step must never crash the pipeline
+        logger.warning("requirement_analyzer.llm_unexpected_error reason=%s: %s", type(error).__name__, error)
+        return _analyze_regex(prompt)
+
+    return Requirement(
+        entity=result.entity,
+        entity_label=result.entityLabel,
+        count=result.count,
+        constraints=result.constraints,
+        schema=DatasetSchema(name=result.entity, version="1.0", fields=result.fields),
+        search_terms=search_terms,
     )
