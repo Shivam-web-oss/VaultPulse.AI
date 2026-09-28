@@ -35,6 +35,8 @@ class SchemaField(BaseModel):
     key: str = Field(min_length=1, max_length=80)
     type: str = Field(min_length=1, max_length=40)
     label: str = Field(min_length=1, max_length=120)
+    required: bool = True
+    options: Optional[list[str]] = None
 
     @field_validator("key", "type", "label")
     @classmethod

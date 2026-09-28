@@ -109,7 +109,11 @@ def _match_provenance(entries: List[ProvenanceEntry], records: List[dict]) -> Li
     by_url = {entry.sourceUrl: entry for entry in entries if entry.sourceUrl}
     matched = []
     for index, record in enumerate(records):
-        entry = by_url.get(str(record.get("url", "")))
+        entry = (
+            by_url.get(str(record.get("url", "")))
+            or by_url.get(str(record.get("_source_url", "")))
+            or by_url.get(str(record.get("_raw", {}).get("url", "")))
+        )
         if entry is not None:
             entry.recordIndex = index
             matched.append(entry)
