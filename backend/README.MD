@@ -50,9 +50,9 @@ AI_MODEL=gemini-2.5-flash
 
 Deploy the backend first, set `NEXT_PUBLIC_API_URL` in the frontend Vercel project to the backend URL, then deploy the frontend. Do not put secrets in `NEXT_PUBLIC_*` variables.
 
-Vercel functions are stateless and request-limited. The chat and document routes are suitable for this entrypoint, but collection jobs currently use background threads, SSE, and local `runtime/tasks` files. Run those workflows on a persistent backend host or migrate them to a durable queue and object storage before relying on collections in production.
+Vercel functions are stateless and request-limited. Collection datasets are persisted in the `collection_tasks.dataset` JSONB column; the backend does not rely on local dataset or UI files. Collection jobs still use background threads and SSE, so run them on a persistent backend host or migrate them to a durable queue before relying on long-running collection jobs in production.
 
-Set `DATABASE_URL` to the Supabase pooler connection string from Project Settings -> Database. For Vercel, choose the IPv4-compatible pooler connection and use its `aws-*.pooler.supabase.com` host, usually port `6543`; do not use the direct `db.<project-ref>.supabase.co` host because it may resolve only to IPv6. Use the URI exactly as Supabase provides it, including `sslmode=require`. On startup, the backend applies the idempotent `migrations/001_initial.sql` migration and uses a bounded `psycopg` connection pool. The frontend does not connect to Supabase directly.
+Set `DATABASE_URL` to the Supabase pooler connection string from Project Settings -> Database. For Vercel, choose the IPv4-compatible pooler connection and use its `aws-*.pooler.supabase.com` host, usually port `6543`; do not use the direct `db.<project-ref>.supabase.co` host because it may resolve only to IPv6. Use the URI exactly as Supabase provides it, including `sslmode=require`. On startup, the backend applies the idempotent SQL migrations in order and uses a bounded `psycopg` connection pool. The frontend does not connect to Supabase directly.
 
 ## Chat Provider
 

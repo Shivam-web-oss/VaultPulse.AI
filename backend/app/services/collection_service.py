@@ -2,7 +2,6 @@ import json
 import logging
 import threading
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -22,16 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 class CollectionTask:
-    """In-memory collection task with filesystem artifact directories."""
+    """Collection task backed by the collection_tasks JSONB dataset."""
 
-    def __init__(self, task_id: str, prompt: str, runtime_root: Path, owner_id: str) -> None:
+    def __init__(self, task_id: str, prompt: str, owner_id: str, parent_task_id: Optional[str] = None, version: int = 1) -> None:
         self.id = task_id
         self.owner_id = owner_id
+        self.parent_task_id = parent_task_id
+        self.version = version
         self.prompt = prompt
         self.status = TaskStatus.CREATED
         self.created_at = datetime.now(timezone.utc)
         self.updated_at = self.created_at
-        self.dir = runtime_root / task_id
         self.view = DatasetView()
         self.schema = DatasetSchema(name="record", version="1.0", fields=[])
         self.items: List[dict] = []
@@ -41,11 +41,13 @@ class CollectionTask:
         self._lock = threading.Lock()
 
     @classmethod
-    def from_row(cls, row: dict, runtime_root: Path) -> "CollectionTask":
-        task = cls(str(row["id"]), row["prompt"], runtime_root, str(row["owner_id"]))
+    def from_row(cls, row: dict) -> "CollectionTask":
+        task = cls(str(row["id"]), row["prompt"], str(row["owner_id"]))
         task.status = TaskStatus(row["status"])
         task.created_at = row["created_at"]
         task.updated_at = row["updated_at"]
+        task.parent_task_id = str(row["parent_task_id"]) if row.get("parent_task_id") else None
+        task.version = row.get("version", 1)
         task.cancel_requested = row["cancel_requested"]
         payload = row.get("dataset") or {}
         if payload:
@@ -122,29 +124,17 @@ class CollectionTask:
             )
             conn.commit()
 
-        # Ephemeral local cache (graceful on read-only environments like Vercel)
-        try:
-            self.dir.mkdir(parents=True, exist_ok=True)
-            path = self.dir / "dataset.json"
-            path.write_text(json.dumps(dataset_dict, indent=2), encoding="utf-8")
-        except OSError as error:
-            logger.debug("Local filesystem write skipped (read-only environment): %s", error)
 
 
 class CollectionService:
-    """Task store: in-memory registry + filesystem artifacts."""
+    """Task store: in-memory task cache backed by Supabase Postgres."""
 
-    def __init__(self, runtime_root: Optional[Path] = None) -> None:
+    def __init__(self) -> None:
         self._tasks: Dict[str, CollectionTask] = {}
         self._lock = threading.Lock()
-        self.runtime_root = Path(runtime_root) if runtime_root else Path("runtime") / "tasks"
 
     def create(self, prompt: str, owner_id: str) -> CollectionTask:
-        task = CollectionTask(str(uuid4()), prompt, self.runtime_root, owner_id)
-        try:
-            task.dir.mkdir(parents=True, exist_ok=True)
-        except OSError as error:
-            logger.debug("Local directory creation skipped: %s", error)
+        task = CollectionTask(str(uuid4()), prompt, owner_id)
         with self._lock:
             self._tasks[task.id] = task
         with connection() as conn:
@@ -155,15 +145,117 @@ class CollectionService:
         logger.info("collection.created task_id=%s", task.id)
         return task
 
+    def rerun(self, task_id: str, owner_id: str, prompt: Optional[str] = None) -> Optional[CollectionTask]:
+        """Append one queued child to the task's root chain under a root-row lock."""
+        with connection() as conn:
+            with conn.transaction():
+                ancestors = conn.execute(
+                    """with recursive ancestry(id, parent_task_id, path) as (
+                           select id, parent_task_id, array[id] from collection_tasks
+                           where id = %s and owner_id = %s
+                           union all
+                           select p.id, p.parent_task_id, a.path || p.id
+                           from collection_tasks p join ancestry a on p.id = a.parent_task_id
+                           where p.owner_id = %s and not p.id = any(a.path)
+                       ) select id from ancestry where parent_task_id is null limit 1""",
+                    (task_id, owner_id, owner_id),
+                ).fetchone()
+                if ancestors is None:
+                    return None
+
+                root_id = ancestors["id"]
+                conn.execute("select id from collection_tasks where id = %s for update", (root_id,)).fetchone()
+                requested = conn.execute(
+                    "select prompt from collection_tasks where id = %s and owner_id = %s",
+                    (task_id, owner_id),
+                ).fetchone()
+                if requested is None:
+                    return None
+                leaf = conn.execute(
+                    """with recursive descendants(id, parent_task_id, version, created_at, depth) as (
+                           select id, parent_task_id, version, created_at, 0 from collection_tasks
+                           where id = %s and owner_id = %s
+                           union all
+                           select c.id, c.parent_task_id, c.version, c.created_at, d.depth + 1
+                           from collection_tasks c join descendants d on c.parent_task_id = d.id
+                           where c.owner_id = %s
+                       ) select d.id, d.version, t.prompt from descendants d
+                         join collection_tasks t using (id)
+                         where not exists (select 1 from collection_tasks c where c.parent_task_id = d.id and c.owner_id = %s)
+                         order by depth desc, created_at desc limit 1""",
+                    (root_id, owner_id, owner_id, owner_id),
+                ).fetchone()
+                if leaf is None:
+                    return None
+                new_id = str(uuid4())
+                next_version = int(leaf["version"]) + 1
+                new_prompt = prompt if prompt is not None else requested["prompt"]
+                row = conn.execute(
+                    """insert into collection_tasks
+                       (id, owner_id, prompt, status, parent_task_id, version)
+                       values (%s, %s, %s, %s, %s, %s)
+                       returning created_at, updated_at""",
+                    (new_id, owner_id, new_prompt, TaskStatus.QUEUED.value, leaf["id"], next_version),
+                ).fetchone()
+
+        task = CollectionTask(new_id, new_prompt, owner_id, str(leaf["id"]), next_version)
+        task.status = TaskStatus.QUEUED
+        task.created_at = row["created_at"]
+        task.updated_at = row["updated_at"]
+        task.write_dataset()
+        with self._lock:
+            self._tasks[task.id] = task
+        task.log_event("STATUS", {"taskId": task.id, "status": task.status.value})
+        logger.info("collection.rerun_created task_id=%s parent_task_id=%s version=%s", task.id, task.parent_task_id, task.version)
+        return task
+
     def get(self, task_id: str, owner_id: str) -> Optional[CollectionTask]:
         with connection() as conn:
-            row = conn.execute("select id, owner_id, prompt, status, created_at, updated_at, dataset, cancel_requested from collection_tasks where id = %s and owner_id = %s", (task_id, owner_id)).fetchone()
+            row = conn.execute("select id, owner_id, prompt, status, created_at, updated_at, dataset, cancel_requested, parent_task_id, version from collection_tasks where id = %s and owner_id = %s", (task_id, owner_id)).fetchone()
         if row is None:
             return None
         task = self._tasks.get(task_id)
         if task is not None:
             return task
-        return CollectionTask.from_row(row, self.runtime_root)
+        return CollectionTask.from_row(row)
+
+    def history(self, task_id: str, owner_id: str) -> Optional[List[CollectionTask]]:
+        with connection() as conn:
+            start = conn.execute(
+                "select id, parent_task_id from collection_tasks where id = %s and owner_id = %s",
+                (task_id, owner_id),
+            ).fetchone()
+            if start is None:
+                return None
+            cursor = start
+            seen = set()
+            while cursor["parent_task_id"] is not None:
+                parent_id = str(cursor["parent_task_id"])
+                if parent_id in seen:
+                    raise ValueError("Cycle found in collection task history")
+                seen.add(parent_id)
+                parent = conn.execute(
+                    "select id, parent_task_id from collection_tasks where id = %s and owner_id = %s",
+                    (parent_id, owner_id),
+                ).fetchone()
+                if parent is None:
+                    break
+                cursor = parent
+            root_id = cursor["id"]
+            rows = conn.execute(
+                """with recursive chain(id, depth, path) as (
+                       select id, 0, array[id] from collection_tasks where id = %s and owner_id = %s
+                       union all
+                       select c.id, chain.depth + 1, chain.path || c.id
+                       from collection_tasks c join chain on c.parent_task_id = chain.id
+                       where c.owner_id = %s and not c.id = any(chain.path)
+                   )
+                   select t.id, t.owner_id, t.prompt, t.status, t.created_at, t.updated_at,
+                          t.dataset, t.cancel_requested, t.parent_task_id, t.version
+                   from chain join collection_tasks t using (id) order by chain.depth, t.created_at""",
+                (root_id, owner_id, owner_id),
+            ).fetchall()
+        return [CollectionTask.from_row(row) for row in rows]
 
     def cancel(self, task_id: str, owner_id: str) -> bool:
         task = self.get(task_id, owner_id)
@@ -176,12 +268,5 @@ class CollectionService:
         task.set_status(TaskStatus.CANCELLED)
         task.log_event("STATUS", {"taskId": task.id, "status": TaskStatus.CANCELLED.value})
         return True
-
-    def dataset_path(self, task_id: str) -> Path:
-        return self.runtime_root / task_id / "dataset.json"
-
-    def ui_path(self, task_id: str) -> Path:
-        return self.runtime_root / task_id / "ui.html"
-
 
 collection_service = CollectionService()

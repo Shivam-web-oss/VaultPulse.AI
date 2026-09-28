@@ -96,7 +96,7 @@ def _json_safe(value):
         return {k: _json_safe(v) for k, v in value.items() if not str(k).startswith("_")}
     if isinstance(value, (list, tuple)):
         if value and all(isinstance(item, ProvenanceEntry) for item in value):
-            return len(value)  # record counts only; full entries go in dataset.json
+            return len(value)  # record counts only; full entries are persisted in the task JSONB dataset
         return [_json_safe(item) for item in value]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value

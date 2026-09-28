@@ -2,13 +2,18 @@
 
 :root {
   color-scheme: dark;
+  --vp-forest: #183528;
+  --vp-forest-deep: #102219;
+  --vp-lime: #b8e978;
+  --vp-lime-soft: #c8ef94;
+  --vp-moss: #70934f;
 }
 
 html,
 body {
   margin: 0;
   min-height: 100%;
-  background: #030b16;
+  background: #102219;
   font-family: var(--font-geist-sans), sans-serif;
 }
 
@@ -30,10 +35,10 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(184, 233, 120, 0.22);
   border-radius: 999px;
 }

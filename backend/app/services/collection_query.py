@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import date, datetime
 from dataclasses import dataclass
 from functools import cmp_to_key
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
@@ -207,19 +208,33 @@ def _matches_clause(item: Dict[str, Any], clause: FilterClause, field_type: str)
             return target_raw in str(item_val)
         return False
 
-    # 2. Date comparison (ISO 8601 strings compare chronologically via lexicographical comparison)
+    # 2. Date comparison uses parsed ISO values so offsets and date formatting
+    # cannot change chronological ordering.
     if field_type == "date":
+        def parse_date(value: Any) -> date:
+            text = str(value).strip()
+            try:
+                return datetime.fromisoformat(text.replace("Z", "+00:00")).date() if "T" in text or " " in text else date.fromisoformat(text)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid date value '{text}' for field '{field}' (expected ISO date)")
+
         if op == "in":
-            target_dates = [v.strip() for v in target_raw.split("|") if v.strip()]
+            target_dates = [parse_date(v) for v in target_raw.split("|") if v.strip()]
             if item_val is None:
                 return False
-            return str(item_val).strip() in target_dates
+            try:
+                return parse_date(item_val) in target_dates
+            except HTTPException:
+                return False
 
-        target_date = target_raw.strip()
+        target_date = parse_date(target_raw)
         if item_val is None:
             return op == "neq"
 
-        val_date = str(item_val).strip()
+        try:
+            val_date = parse_date(item_val)
+        except HTTPException:
+            return op == "neq"
 
         if op == "eq":
             return val_date == target_date
@@ -234,7 +249,7 @@ def _matches_clause(item: Dict[str, Any], clause: FilterClause, field_type: str)
         elif op == "lte":
             return val_date <= target_date
         elif op == "contains":
-            return target_date in val_date
+            return target_raw.strip().lower() in str(item_val).lower()
         return False
 
     # 3. String / Text / Link / Email / Enum comparison
@@ -274,7 +289,7 @@ def _item_matches_search(item: Dict[str, Any], search_query: str) -> bool:
     for k, v in item.items():
         if k.startswith("_"):
             continue
-        if v is not None and q in str(v).lower():
+        if isinstance(v, str) and q in v.lower():
             return True
     return False
 
@@ -317,11 +332,15 @@ def _compare_items(
                 elif str_a > str_b:
                     diff = 1
         elif ftype == "date":
-            str_a, str_b = str(val_a).strip(), str(val_b).strip()
-            if str_a < str_b:
-                diff = -1
-            elif str_a > str_b:
-                diff = 1
+            try:
+                def date_value(value: Any) -> date:
+                    raw = str(value).strip()
+                    return datetime.fromisoformat(raw.replace("Z", "+00:00")).date() if "T" in raw or " " in raw else date.fromisoformat(raw)
+                date_a, date_b = date_value(val_a), date_value(val_b)
+                diff = (date_a > date_b) - (date_a < date_b)
+            except ValueError:
+                str_a, str_b = str(val_a).strip(), str(val_b).strip()
+                diff = (str_a > str_b) - (str_a < str_b)
         else:
             str_a, str_b = str(val_a).lower(), str(val_b).lower()
             if str_a < str_b:

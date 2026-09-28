@@ -50,9 +50,10 @@ def connection() -> Iterator:
 
 
 def initialize_database() -> None:
-    migration = Path(__file__).resolve().parents[1] / "migrations" / "001_initial.sql"
+    migrations = sorted((Path(__file__).resolve().parents[1] / "migrations").glob("*.sql"))
     with psycopg.connect(_database_url(), connect_timeout=5) as conn:
-        conn.execute(migration.read_text(encoding="utf-8"))
+        for migration in migrations:
+            conn.execute(migration.read_text(encoding="utf-8"))
         conn.commit()
 
 

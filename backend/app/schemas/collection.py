@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class TaskStatus(str, Enum):
     CREATED = "CREATED"
+    QUEUED = "QUEUED"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     PARTIAL = "PARTIAL"
@@ -29,6 +30,8 @@ class CollectionCreateRequest(BaseModel):
 class CollectionCreatedResponse(BaseModel):
     taskId: str
     status: TaskStatus = TaskStatus.CREATED
+    parentTaskId: Optional[str] = None
+    version: int = 1
 
 
 class SchemaField(BaseModel):
@@ -97,6 +100,8 @@ class CollectionStatusResponse(BaseModel):
     createdAt: datetime
     updatedAt: datetime
     recordCount: int
+    parentTaskId: Optional[str] = None
+    version: int = 1
 
 
 class CollectionResultResponse(BaseModel):
@@ -108,6 +113,32 @@ class CollectionResultResponse(BaseModel):
     summary: Optional[dict[str, Any]] = None
     quality: Optional[dict[str, Any]] = None
     sources: list[str] = Field(default_factory=list)
+    parentTaskId: Optional[str] = None
+    version: int = 1
+
+
+class CollectionRerunRequest(BaseModel):
+    prompt: Optional[str] = Field(default=None, min_length=1, max_length=4000)
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("prompt must contain non-whitespace characters")
+        return normalized
+
+
+class CollectionHistoryEntry(BaseModel):
+    taskId: str
+    version: int
+    status: TaskStatus
+    createdAt: datetime
+    prompt: str
+    recordCount: int
+    quality: Optional[dict[str, Any]] = None
 
 
 class CollectionDataResponse(BaseModel):

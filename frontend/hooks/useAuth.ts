@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginUser, registerUser } from '../lib/authApi';
 import { useAuthContext } from '../context/AuthContext';
-import { HOME_ROUTE, LOGIN_ROUTE } from '../routes';
+import { DEFAULT_CHAT_ROUTE, LOGIN_ROUTE } from '../routes';
 import { type LoginForm, type RegistrationForm } from '../types/user';
 
 export function useAuth() {
@@ -15,7 +15,7 @@ export function useAuth() {
   const [isReady] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated) router.replace(HOME_ROUTE);
+    if (isAuthenticated) router.replace(DEFAULT_CHAT_ROUTE);
   }, [isAuthenticated, router]);
 
   const updateField = (field: keyof LoginForm, value: string) => {
@@ -33,7 +33,7 @@ export function useAuth() {
     try {
       const response = await loginUser(form.email.trim(), form.password);
       setSession(response);
-      router.push(HOME_ROUTE);
+      router.push(DEFAULT_CHAT_ROUTE);
     } catch {
       setError('Sign in failed. Check your credentials and try again.');
     }
@@ -50,7 +50,7 @@ export function useRegistration() {
   const [isReady] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated) router.replace(HOME_ROUTE);
+    if (isAuthenticated) router.replace(DEFAULT_CHAT_ROUTE);
   }, [isAuthenticated, router]);
 
   const updateField = (field: keyof RegistrationForm, value: string) => {
@@ -68,7 +68,7 @@ export function useRegistration() {
     try {
       const response = await registerUser(form.name.trim(), form.email.trim(), form.password);
       setSession(response);
-      router.push(HOME_ROUTE);
+      router.push(DEFAULT_CHAT_ROUTE);
     } catch {
       setError('Registration failed. Make sure the FastAPI backend is running and try again.');
     }
