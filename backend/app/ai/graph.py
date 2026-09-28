@@ -20,6 +20,7 @@ from app.ai.planner import plan
 from app.ai.requirement_analyzer import Requirement, analyze
 from app.ai.state import CollectionState
 from app.processing import quality
+from app.processing.normalize import normalize_records
 from app.schemas.collection import ProvenanceEntry
 from app.tools import registry
 
@@ -114,18 +115,27 @@ def extract(state: CollectionState) -> dict:
     for item in result.get("items", []):
         record = dict(item.get("record", {}))
         provenance = item.get("provenance", {})
-        records.append({k: v for k, v in record.items() if not str(k).startswith("_")})
+        source_url = str(provenance.get("sourceUrl", record.get("url", "")))
+        retrieved_at = provenance.get("retrievedAt") or datetime.now(timezone.utc)
+        rec = {k: v for k, v in record.items() if not str(k).startswith("_")}
+        rec["_source_url"] = source_url
+        rec["_fetched_at"] = retrieved_at
+        records.append(rec)
         entries.append(ProvenanceEntry(
             recordIndex=len(records) - 1,
-            sourceUrl=str(provenance.get("sourceUrl", record.get("url", ""))),
+            sourceUrl=source_url,
             sourceName=str(provenance.get("sourceName", "")),
-            retrievedAt=provenance.get("retrievedAt") or datetime.now(timezone.utc),
+            retrievedAt=retrieved_at,
         ))
     return {"extracted_records": records, "provenance_entries": entries}
 
 
 def normalize(state: CollectionState) -> dict:
-    return {"normalized_records": state.get("extracted_records", [])}  # Phase E adds real normalization
+    requirement = _requirement(state)
+    schema = requirement.schema if requirement else None
+    extracted = state.get("extracted_records", [])
+    normalized = normalize_records(extracted, schema)
+    return {"normalized_records": normalized}
 
 
 def validate(state: CollectionState) -> dict:
@@ -135,7 +145,8 @@ def validate(state: CollectionState) -> dict:
 
 def deduplicate(state: CollectionState) -> dict:
     merged = quality.deduplicate_records(state.get("valid_records", []), state.get("final_records", []))
-    return {"final_records": merged, "current_count": len(merged)}
+    valid_count = sum(1 for r in merged if r.get("_is_valid", True))
+    return {"final_records": merged, "current_count": valid_count}
 
 
 def build_schema(state: CollectionState) -> dict:

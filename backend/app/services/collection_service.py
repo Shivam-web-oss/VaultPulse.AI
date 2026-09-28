@@ -114,15 +114,21 @@ class CollectionTask:
         )
 
     def write_dataset(self) -> None:
-        self.dir.mkdir(parents=True, exist_ok=True)
-        path = self.dir / "dataset.json"
-        path.write_text(
-            json.dumps(json.loads(self.dataset().model_dump_json(by_alias=True)), indent=2),
-            encoding="utf-8",
-        )
+        dataset_dict = json.loads(self.dataset().model_dump_json(by_alias=True))
         with connection() as conn:
-            conn.execute("update collection_tasks set dataset = %s, updated_at = %s where id = %s", (Jsonb(json.loads(self.dataset().model_dump_json(by_alias=True))), self.updated_at, self.id))
+            conn.execute(
+                "update collection_tasks set dataset = %s, updated_at = %s where id = %s",
+                (Jsonb(dataset_dict), self.updated_at, self.id),
+            )
             conn.commit()
+
+        # Ephemeral local cache (graceful on read-only environments like Vercel)
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            path = self.dir / "dataset.json"
+            path.write_text(json.dumps(dataset_dict, indent=2), encoding="utf-8")
+        except OSError as error:
+            logger.debug("Local filesystem write skipped (read-only environment): %s", error)
 
 
 class CollectionService:
@@ -135,7 +141,10 @@ class CollectionService:
 
     def create(self, prompt: str, owner_id: str) -> CollectionTask:
         task = CollectionTask(str(uuid4()), prompt, self.runtime_root, owner_id)
-        task.dir.mkdir(parents=True, exist_ok=True)
+        try:
+            task.dir.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            logger.debug("Local directory creation skipped: %s", error)
         with self._lock:
             self._tasks[task.id] = task
         with connection() as conn:

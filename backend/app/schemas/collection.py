@@ -35,6 +35,8 @@ class SchemaField(BaseModel):
     key: str = Field(min_length=1, max_length=80)
     type: str = Field(min_length=1, max_length=40)
     label: str = Field(min_length=1, max_length=120)
+    required: bool = True
+    options: Optional[list[str]] = None
 
     @field_validator("key", "type", "label")
     @classmethod
@@ -100,9 +102,21 @@ class CollectionStatusResponse(BaseModel):
 class CollectionResultResponse(BaseModel):
     request: dict[str, Any]
     dataset: Dataset
-    ui: dict[str, Any]
-    provenance: list[ProvenanceEntry]
-    files: dict[str, str]
+    ui: Optional[dict[str, Any]] = None
+    provenance: list[ProvenanceEntry] = Field(default_factory=list)
+    files: dict[str, str] = Field(default_factory=dict)
+    summary: Optional[dict[str, Any]] = None
+    quality: Optional[dict[str, Any]] = None
+    sources: list[str] = Field(default_factory=list)
+
+
+class CollectionDataResponse(BaseModel):
+    total: int = Field(ge=0)
+    page: int = Field(ge=1)
+    pageSize: int = Field(alias="page_size", ge=1)
+    items: list[dict[str, Any]] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
 
 
 class CancelResponse(BaseModel):
