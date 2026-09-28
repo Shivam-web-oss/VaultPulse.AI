@@ -28,6 +28,11 @@ _NODE_EVENTS = {
     "build_dataset": "DATASET_READY",
 }
 
+# State keys reduced with append semantics in CollectionState; streamed node
+# updates for these must be extended, not replaced, or earlier rounds' data
+# (notably provenance_entries) would be lost from the final snapshot.
+_APPEND_KEYS = {"raw_evidence", "extracted_records", "provenance_entries"}
+
 
 def _cancelled(task: CollectionTask) -> bool:
     return task.cancel_requested or task.status == TaskStatus.CANCELLED
@@ -40,7 +45,11 @@ def _run(task: CollectionTask) -> None:
         for node, update in chunk.items():
             if _cancelled(task):
                 return
-            final_state.update(update or {})
+            for key, value in (update or {}).items():
+                if key in _APPEND_KEYS and isinstance(value, list):
+                    final_state.setdefault(key, []).extend(value)
+                else:
+                    final_state[key] = value
             payload = dict(update or {})
             event = _NODE_EVENTS.get(node, node.upper())
             task.log_event(event, _compact(payload))
@@ -53,7 +62,12 @@ def _run(task: CollectionTask) -> None:
                 task.log_event("PROGRESS", {"current": payload.get("current_count", 0)})
 
     # Publish final records into the task and persist the dataset.
+    # Cap over-delivery at the requested count (rounds over-fetch to absorb
+    # validation attrition; the dataset should match what the user asked for).
     records: List[dict] = final_state.get("final_records", [])
+    target = final_state.get("target_count")
+    if target and len(records) > target:
+        records = records[:target]
     entries = _match_provenance(final_state.get("provenance_entries", []), records)
     schema = final_state.get("schema") or {"name": "record", "version": "1.0", "fields": []}
     view = DatasetView(**(final_state.get("view") or {}))

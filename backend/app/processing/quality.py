@@ -15,7 +15,7 @@ def validate_records(records: List[dict], requirement: Requirement) -> List[dict
     for record in records:
         if max_price is not None and "price" in record and record["price"] > max_price:
             continue
-        if "url" in record and not str(record["url"]).startswith("https://"):
+        if "url" in record and not str(record["url"]).startswith(("https://", "http://")):
             continue
         if "rating" in record and not 0 <= record["rating"] <= 5:
             continue
