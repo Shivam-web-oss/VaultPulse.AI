@@ -2,6 +2,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import urlparse
 
 import psycopg
 from psycopg.rows import dict_row
@@ -16,6 +17,12 @@ def _database_url() -> str:
     value = os.getenv("DATABASE_URL", "").strip()
     if not value:
         raise DatabaseNotConfiguredError("DATABASE_URL is not configured")
+    hostname = urlparse(value).hostname or ""
+    if os.getenv("VERCEL") == "1" and hostname.endswith(".supabase.co") and hostname.startswith("db."):
+        raise DatabaseNotConfiguredError(
+            "Vercel cannot use Supabase's direct db.* hostname. Set DATABASE_URL to the Supabase pooler URL "
+            "from Project Settings > Database (use the aws-*.pooler.supabase.com host)."
+        )
     return value
 
 

@@ -19,7 +19,7 @@ The API runs at `http://localhost:8000`. Set `LOG_LEVEL` to control backend cons
 The FastAPI app has a Vercel entrypoint at `api/index.py`. Create a separate Vercel project from this repository with the project root set to `backend`; Vercel will detect the Python function from that file. Configure these environment variables in the Vercel project:
 
 ```text
-DATABASE_URL=your-production-postgresql-url
+DATABASE_URL=postgresql://postgres.project-ref:password@aws-0-region.pooler.supabase.com:6543/postgres?sslmode=require
 CORS_ORIGINS=https://your-frontend-domain.vercel.app
 AI_PROVIDER_API_KEY=your-key
 AI_PROVIDER_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
@@ -30,7 +30,7 @@ Deploy the backend first, set `NEXT_PUBLIC_API_URL` in the frontend Vercel proje
 
 Vercel functions are stateless and request-limited. The chat and document routes are suitable for this entrypoint, but collection jobs currently use background threads, SSE, and local `runtime/tasks` files. Run those workflows on a persistent backend host or migrate them to a durable queue and object storage before relying on collections in production.
 
-Set `DATABASE_URL` to the Supabase Postgres connection string from Project Settings -> Database. Use the URI exactly as Supabase provides it, including `sslmode=require`; do not leave bracket placeholders or use an unresolvable host. On startup, the backend applies the idempotent `migrations/001_initial.sql` migration and uses a bounded `psycopg` connection pool. The frontend does not connect to Supabase directly.
+Set `DATABASE_URL` to the Supabase pooler connection string from Project Settings -> Database. For Vercel, choose the IPv4-compatible pooler connection and use its `aws-*.pooler.supabase.com` host, usually port `6543`; do not use the direct `db.<project-ref>.supabase.co` host because it may resolve only to IPv6. Use the URI exactly as Supabase provides it, including `sslmode=require`. On startup, the backend applies the idempotent `migrations/001_initial.sql` migration and uses a bounded `psycopg` connection pool. The frontend does not connect to Supabase directly.
 
 ## Chat Provider
 
