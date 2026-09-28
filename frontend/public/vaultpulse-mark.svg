@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="shieldBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+    <linearGradient id="pulseGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F5D4" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22" fill="#090D16" />
+  <path d="M50 16 L22 28 V50 C22 68 35 84 50 89 C65 84 78 68 78 50 V28 L50 16 Z"
+    fill="url(#shieldBg)" stroke="#334155" stroke-width="3" stroke-linejoin="round" />
+  <path d="M30 52 H38 L43 38 L51 64 L58 44 L63 52 H70"
+    fill="none" stroke="url(#pulseGlow)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

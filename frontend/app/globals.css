@@ -1,20 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --vp-forest: #183528;
   --vp-forest-deep: #102219;
   --vp-lime: #b8e978;
   --vp-lime-soft: #c8ef94;
   --vp-moss: #70934f;
+  --app-bg: #f6f8f3;
+  --app-surface: #ffffff;
+  --app-surface-muted: #edf1e9;
+  --app-border: #d7e0d4;
+  --app-text: #18251d;
+  --app-muted: #526158;
+  --app-subtle: #68756b;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --app-bg: #102219;
+  --app-surface: #183528;
+  --app-surface-muted: #142c20;
+  --app-border: rgba(255, 255, 255, 0.16);
+  --app-text: #f4f7f3;
+  --app-muted: #c0ccc2;
+  --app-subtle: #9ba99d;
 }
 
 html,
 body {
-  margin: 0;
   min-height: 100%;
-  background: #102219;
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family: var(--font-geist-sans), sans-serif;
+}
+
+body {
+  min-height: 100vh;
 }
 
 * {
@@ -26,8 +49,350 @@ input {
   font: inherit;
 }
 
-body {
+.auth-page {
+  background: #f6f8f3;
+  color: #18251d;
+}
+
+:root[data-theme='dark'] .auth-page {
+  background: #102219;
+  color: #f8faf8;
+}
+
+.auth-card {
+  background: #f3f5f1;
+  border-color: #dfe5dc;
+  color: #18251d;
+}
+
+:root[data-theme='dark'] .auth-page .auth-card {
+  background: #183528;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f8faf8;
+}
+
+.auth-heading {
+  color: #18251d;
+}
+
+:root[data-theme='dark'] .auth-page .auth-heading {
+  color: #f8faf8;
+}
+
+.auth-muted {
+  color: #68756b;
+}
+
+:root[data-theme='dark'] .auth-page .auth-muted {
+  color: #b4c0b6;
+}
+
+.auth-label {
+  color: #526158;
+}
+
+:root[data-theme='dark'] .auth-page .auth-label {
+  color: #d2dbd3;
+}
+
+.auth-input {
+  background: #e7ebe5;
+  border-color: #cbd5c8;
+  color: #18251d;
+}
+
+:root[data-theme='dark'] .auth-page .auth-input {
+  background: #102219;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f8faf8;
+}
+
+.auth-input::placeholder {
+  color: #68756b;
+}
+
+:root[data-theme='dark'] .auth-page .auth-input::placeholder {
+  color: #a8b4aa;
+}
+
+.auth-link {
+  color: #426b31;
+}
+
+:root[data-theme='dark'] .auth-page .auth-link {
+  color: #c8ef94;
+}
+
+.theme-toggle {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.theme-toggle:hover {
+  background: var(--app-surface-muted);
+}
+
+.chat-shell {
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.chat-sidebar {
+  background: var(--app-surface-muted);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.chat-sidebar .border-b,
+.chat-sidebar .border-t,
+.chat-sidebar [class~="border-white/10"] {
+  border-color: var(--app-border);
+}
+
+.chat-sidebar [class*="text-slate-200"],
+.chat-sidebar [class*="text-white"] {
+  color: var(--app-text);
+}
+
+.chat-sidebar [class*="text-slate-400"],
+.chat-sidebar [class*="text-slate-500"] {
+  color: var(--app-muted);
+}
+
+.chat-sidebar [class*="text-slate-600"] {
+  color: var(--app-subtle);
+}
+
+:root[data-theme='light'] .chat-sidebar [class*="bg-white/5"],
+:root[data-theme='light'] .chat-sidebar [class*="bg-white/10"] {
+  background-color: rgba(24, 53, 40, 0.06);
+}
+
+:root[data-theme='light'] .chat-sidebar [class*="bg-white/10"] {
+  color: #20351f;
+}
+
+.chat-header,
+.chat-mobile-header {
+  border-color: var(--app-border);
+  background: var(--app-bg);
+}
+
+.chat-header .text-white,
+.chat-mobile-header .text-white {
+  color: var(--app-text);
+}
+
+.chat-header [class*="text-slate-400"],
+.chat-header [class*="text-slate-500"],
+.chat-mobile-header [class*="text-slate-300"] {
+  color: var(--app-muted);
+}
+
+.chat-composer {
+  background: var(--app-bg);
+  border-color: var(--app-border);
+}
+
+.chat-composer-panel {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+.chat-composer textarea {
+  color: var(--app-text);
+}
+
+.chat-composer textarea::placeholder {
+  color: var(--app-subtle);
+}
+
+.chat-composer [class*="text-slate-400"] {
+  color: var(--app-muted);
+}
+
+.chat-composer-hint {
+  color: var(--app-subtle);
+}
+
+.chat-assistant-message {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.chat-assistant-message .message-actions button {
+  color: var(--app-muted);
+}
+
+.chat-assistant-message .message-actions button:hover {
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+}
+
+.chat-user-message .message-actions button {
+  color: #355b2c;
+}
+
+.chat-user-message .message-actions button:hover {
+  background: rgba(24, 53, 40, 0.1);
+  color: #20351f;
+}
+
+.chat-inline-code {
+  background: var(--app-surface-muted);
+  color: #426b31;
+}
+
+:root[data-theme='dark'] .chat-inline-code {
+  color: #c8ef94;
+}
+
+.chat-bot-avatar {
+  background: rgba(112, 147, 79, 0.15);
+  color: #426b31;
+}
+
+:root[data-theme='dark'] .chat-bot-avatar {
+  color: #c8ef94;
+}
+
+.chat-empty-title {
+  color: var(--app-text);
+}
+
+.chat-empty-description {
+  color: var(--app-muted);
+}
+
+.chat-empty-icon,
+.chat-empty-suggestion svg,
+.chat-attachment svg {
+  color: #426b31;
+}
+
+:root[data-theme='dark'] .chat-empty-icon,
+:root[data-theme='dark'] .chat-empty-suggestion svg,
+:root[data-theme='dark'] .chat-attachment svg {
+  color: #c8ef94;
+}
+
+.chat-empty-suggestion {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.chat-empty-suggestion:hover {
+  background: var(--app-surface-muted);
+}
+
+.chat-attachment {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.settings-page {
   min-height: 100vh;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.settings-page [class~="border-white/10"],
+.settings-page [class~="border-t"] {
+  border-color: var(--app-border);
+}
+
+.settings-page [class*="text-slate-400"],
+.settings-page [class*="text-slate-300"] {
+  color: var(--app-muted);
+}
+
+.settings-page [class*="hover:bg-white/5"]:hover {
+  background: var(--app-surface-muted);
+}
+
+.settings-page button {
+  border-color: var(--app-border);
+}
+
+.settings-page .settings-selected {
+  background: rgba(184, 233, 120, 0.18);
+}
+
+.settings-page input[type="checkbox"] {
+  accent-color: #70934f;
+}
+
+:root[data-theme='dark'] .settings-page input[type="checkbox"] {
+  accent-color: #b8e978;
+}
+
+:root[data-theme='light'] .settings-page .settings-selected {
+  color: #20351f;
+}
+
+:root[data-theme='dark'] .settings-page .settings-selected {
+  color: #f4f7f3;
+}
+
+:root[data-theme='dark'] .landing-page {
+  background: #102219;
+  color: #f4f7f3;
+}
+
+:root[data-theme='dark'] .landing-page header nav a,
+:root[data-theme='dark'] .landing-page header > div > a:first-of-type {
+  color: #c0ccc2;
+}
+
+:root[data-theme='dark'] .landing-page #workspace h1,
+:root[data-theme='dark'] .landing-page #capabilities h2,
+:root[data-theme='dark'] .landing-page #capabilities h3 {
+  color: #f4f7f3;
+}
+
+:root[data-theme='dark'] .landing-page #workspace > div > div > p,
+:root[data-theme='dark'] .landing-page #capabilities p {
+  color: #c0ccc2;
+}
+
+:root[data-theme='dark'] .landing-page #capabilities {
+  background: #142c20;
+  border-color: var(--app-border);
+}
+
+:root[data-theme='dark'] .landing-page footer {
+  color: #a8b4aa;
+}
+
+:root[data-theme='dark'] .landing-page footer a {
+  color: #d7e5d8;
+}
+
+:root[data-theme='dark'] .landing-page #capabilities article > span {
+  background: #284732;
+  color: #c8ef94;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-page,
+  .auth-card,
+  .theme-toggle,
+  .chat-shell,
+  .chat-sidebar,
+  .chat-header,
+  .chat-mobile-header,
+  .chat-composer,
+  .chat-composer-panel,
+  .chat-assistant-message,
+  .settings-page,
+  .landing-page,
+  .landing-page #capabilities {
+    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -35,10 +400,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--app-surface-muted);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(184, 233, 120, 0.22);
+  background: rgba(112, 147, 79, 0.45);
   border-radius: 999px;
+}
+
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(184, 233, 120, 0.28);
 }

@@ -5,20 +5,21 @@ import {
   Check,
   FileText,
   FolderOpen,
-  LockKeyhole,
   MessageSquare,
   Search,
   ShieldCheck,
   Sparkles,
   Upload,
 } from 'lucide-react';
+import { ThemeToggle } from '../components/ui/ThemeToggle';
+import { BrandMark } from '../components/BrandMark';
 
 export default function HomePage() {
 	return (
-		<main className="min-h-screen overflow-hidden bg-[#f6f8f3] text-[#18251d]">
+		<main className="landing-page min-h-screen overflow-hidden bg-[#f6f8f3] text-[#18251d]">
 			<header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
 				<Link href="/" aria-label="VaultPulse.AI home" className="flex items-center gap-2.5 font-semibold tracking-tight">
-					<span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#183528] text-[#c8f27c]"><LockKeyhole size={18} /></span>
+					<BrandMark size={36} className="rounded-xl" />
 					<span>VaultPulse<span className="text-[#739c59]">.AI</span></span>
 				</Link>
 				<nav aria-label="Main navigation" className="hidden items-center gap-8 text-sm text-[#526158] md:flex">
@@ -27,6 +28,7 @@ export default function HomePage() {
 					<a href="#privacy" className="transition hover:text-[#18251d]">Privacy</a>
 				</nav>
 				<div className="flex items-center gap-2 sm:gap-3">
+					<ThemeToggle />
 					<Link href="/login" className="rounded-full px-3 py-2 text-sm font-medium text-[#526158] transition hover:text-[#18251d] sm:px-4">Sign in</Link>
 					<Link href="/register" className="inline-flex items-center gap-2 rounded-full bg-[#183528] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#244a37] sm:px-5">Get started <ArrowUpRight size={15} /></Link>
 				</div>
@@ -119,7 +121,7 @@ export default function HomePage() {
 			</section>
 
 			<footer className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-6 text-xs text-[#778278] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
-				<Link href="/" className="font-semibold text-[#405447]">VaultPulse.AI</Link><p>© 2026 VaultPulse.AI. A little more clarity for your day.</p>
+				<Link href="/" aria-label="VaultPulse.AI home" className="inline-flex items-center gap-2 font-semibold text-[#405447]"><BrandMark size={24} className="rounded-md" />VaultPulse.AI</Link><p>© 2026 VaultPulse.AI. A little more clarity for your day.</p>
 			</footer>
 		</main>
 	);

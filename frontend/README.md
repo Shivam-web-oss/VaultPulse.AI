@@ -25,6 +25,10 @@ npm run dev
 
 The app runs at `http://localhost:3000`.
 
+## Branding
+
+The shield-and-pulse mark is stored in `public/vaultpulse-mark.svg` and reused through `components/BrandMark.tsx` across the landing page, authentication screens, and chat navigation. `app/icon.svg` uses the same mark as the browser icon.
+
 Set `NEXT_PUBLIC_API_URL` in `.env.local` when the backend is not running at `http://localhost:8000`. Use `.env.example` as the template. Never commit secrets.
 
 ## Deploy To Vercel
