@@ -16,10 +16,10 @@ VaultPulse.AI turns that requirement into a structured, source-backed dataset �
 ## Product Preview
 
 <p align="center">
-  <img src="docs/screenshots/landing.png" alt="VaultPulse.AI landing page" width="900" />
+  <img src="docs/screenshots/chat-workspace.png" alt="VaultPulse.AI chat workspace" width="900" />
 </p>
 <p align="center">
-  <sub>The VaultPulse.AI workspace — a private, account-based space for conversations and documents.</sub>
+  <sub>The VaultPulse.AI workspace — persistent conversations, document uploads, and provider-backed AI answers.</sub>
 </p>
 
 The product ships today as two halves:
@@ -202,19 +202,32 @@ VaultPulse.AI/
 ## Screenshots
 
 <p align="center">
+  <img src="docs/screenshots/landing.png" alt="VaultPulse.AI landing page" width="900" />
+</p>
+<p align="center">
+  <sub>Landing page at <a href="https://vault-pulse-ai.vercel.app/">vault-pulse-ai.vercel.app</a>.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/chat-workspace.png" alt="VaultPulse.AI chat workspace, light theme" width="900" />
+</p>
+<p align="center">
+  <sub>The chat workspace — conversation history, search, and a live provider response.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/chat-workspace-dark.png" alt="VaultPulse.AI chat workspace, dark theme" width="900" />
+</p>
+<p align="center">
+  <sub>Dark theme. Messages support copy actions, and the composer accepts attachments.</sub>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/register.png" alt="VaultPulse.AI account registration" width="800" />
 </p>
 <p align="center">
   <sub>Account creation — the gateway to the workspace.</sub>
 </p>
-
-<!-- TODO(team): capture and add these authenticated screenshots from the live app
-     (register a demo account, then screenshot at 1440x900):
-  - docs/screenshots/chat-workspace.png  — /chat/new with sidebar conversation history
-  - docs/screenshots/chat-response.png   — a real provider response in a conversation
-  - docs/screenshots/document-upload.png — a completed upload listed in the sidebar
-  - docs/screenshots/settings.png        — /settings appearance + chat preferences
--->
 
 ---
 
