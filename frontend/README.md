@@ -210,6 +210,12 @@ The frontend is maintained as a separate project from `backend/`; project-specif
 | Grouped conversations by their actual update date. | Prevent the same conversation from appearing in every sidebar section. | `components/layout/Sidebar.tsx` |
 | Displayed backend provider errors in the chat error state. | Make a `503` actionable instead of hiding its cause. | `hooks/useChat.ts` |
 
+### 2026-09-29
+
+| Change | Reason | Effected files |
+| --- | --- | --- |
+| Show per-account previous chats by their first user message and make sidebar search functional. | Make conversation history recognizable and searchable without mixing accounts. | `components/layout/Sidebar.tsx`, `hooks/useChat.ts` |
+
 ## Validation
 
 ```powershell

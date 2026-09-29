@@ -19,7 +19,17 @@ class ConversationService:
 
     def list(self, owner_id: str) -> List[ConversationOut]:
         with connection() as conn:
-            rows = conn.execute("select id, title, created_at, updated_at from conversations where owner_id = %s order by updated_at desc", (owner_id,)).fetchall()
+            rows = conn.execute(
+                """select c.id,
+                          case when c.title = 'New conversation' then coalesce(
+                              (select left(trim(regexp_replace(m.content, '[[:space:]]+', ' ', 'g')), 80)
+                               from messages m where m.conversation_id = c.id and m.role = 'user'
+                               order by m.created_at, m.id limit 1), c.title)
+                              else c.title end as title,
+                          c.created_at, c.updated_at
+                   from conversations c where c.owner_id = %s order by c.updated_at desc""",
+                (owner_id,),
+            ).fetchall()
         return [ConversationOut(**self._conversation_row(row)) for row in rows]
 
     def get_detail(self, conversation_id: str, owner_id: str) -> Optional[ConversationDetailOut]:
@@ -45,7 +55,17 @@ class ConversationService:
             if conversation is None:
                 raise KeyError(conversation_id)
             row = conn.execute("insert into messages (id, conversation_id, role, content) values (%s, %s, %s, %s) returning id, role, content, created_at", (message_id, conversation_id, role, content)).fetchone()
-            conn.execute("update conversations set updated_at = now() where id = %s", (conversation_id,))
+            conn.execute(
+                """update conversations c
+                   set title = case when c.title = 'New conversation' then coalesce(
+                           (select left(trim(regexp_replace(m.content, '[[:space:]]+', ' ', 'g')), 80)
+                            from messages m where m.conversation_id = c.id and m.role = 'user'
+                            order by m.created_at, m.id limit 1), c.title)
+                       else c.title end,
+                       updated_at = now()
+                   where c.id = %s and c.owner_id = %s""",
+                (conversation_id, owner_id),
+            )
             conn.commit()
         logger.info("conversation.message_added conversation_id=%s owner_id=%s role=%s", conversation_id, owner_id, role)
         return MessageOut(**self._message_row(row))

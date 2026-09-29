@@ -88,6 +88,10 @@ Pydantic schemas reject whitespace-only messages, prompts, and titles, normalize
 | Change | Reason | Effected files |
 | --- | --- | --- |
 | Replaced the deterministic fake collector with real permitted sources (scraping sandbox + keyless public APIs). | Phase D: collection results and provenance must reflect real HTTP responses, not synthetic data. | `app/tools/registry.py`, `app/tools/sources.py`, `app/tools/fetcher.py`, `app/ai/graph.py` |
+
+### 2026-09-29
+
+| Give default conversations a title from their first user message; retain owner-scoped history listing. | Make each account's sidebar history identifiable while preserving conversation ownership checks. | `app/services/conversation_service.py` |
 | Added a real source policy: explicit domain allow-list, robots.txt fetch/cache/enforcement, per-domain token-bucket rate limits. | Respect terms, access restrictions, and rate limits before any fetch. | `app/tools/source_policy.py`, `app/tools/fetcher.py` |
 | Added over-fetch planning and count capping; clean search-term extraction from prompts. | Validation drops failing records, so plan raw volume above target and deliver exactly what was requested. | `app/ai/planner.py`, `app/ai/requirement_analyzer.py`, `app/workflow/executor.py` |
 | Removed the fake collector and its source ceiling. | Fake source keys and synthetic provenance are no longer part of the pipeline. | `app/ai/fake_collector.py` (deleted), `app/ai/requirement_analyzer.py` |

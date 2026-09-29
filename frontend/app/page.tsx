@@ -44,7 +44,7 @@ export default function HomePage() {
 						Your knowledge, <span className="text-[#67994a]">in reach.</span>
 					</h1>
 					<p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-[#657269] sm:text-lg sm:leading-8">
-						Bring your files and conversations together, then ask a thoughtful assistant to help you find the signal.
+						Bring your Questions and conversations together, then ask a thoughtful assistant to help you find the signal.
 					</p>
 					<div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
 						<Link href="/register" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#b8e978] px-6 text-sm font-semibold text-[#20351f] shadow-[0_5px_16px_rgba(124,166,79,0.2)] transition hover:bg-[#c7f28c]">Create your workspace <ArrowRight size={16} /></Link>

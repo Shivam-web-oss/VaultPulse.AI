@@ -12,6 +12,7 @@ export function useAuth() {
   const { isAuthenticated, user, setSession, logOut } = useAuthContext();
   const [form, setForm] = useState<LoginForm>({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReady] = useState(true);
 
   useEffect(() => {
@@ -25,21 +26,25 @@ export function useAuth() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
     if (!form.email.trim() || !form.password.trim()) {
       setError('Please enter both email and password.');
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const response = await loginUser(form.email.trim(), form.password);
       setSession(response);
       router.push(DEFAULT_CHAT_ROUTE);
     } catch {
       setError('Sign in failed. Check your credentials and try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  return { form, updateField, handleSubmit, error, isReady, currentUser: user, logOut: () => { logOut(); router.push(LOGIN_ROUTE); } };
+  return { form, updateField, handleSubmit, error, isReady, isSubmitting, currentUser: user, logOut: () => { logOut(); router.push(LOGIN_ROUTE); } };
 }
 
 export function useRegistration() {
@@ -47,6 +52,7 @@ export function useRegistration() {
   const { isAuthenticated, setSession } = useAuthContext();
   const [form, setForm] = useState<RegistrationForm>({ name: '', email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReady] = useState(true);
 
   useEffect(() => {
@@ -60,19 +66,23 @@ export function useRegistration() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
     if (form.name.trim().length < 2) return setError('Please enter your name.');
     if (!form.email.trim() || !form.password) return setError('Please complete all fields.');
     if (form.password.length < 8) return setError('Password must be at least 8 characters.');
     if (form.password !== form.confirmPassword) return setError('Passwords do not match.');
 
+    setIsSubmitting(true);
     try {
       const response = await registerUser(form.name.trim(), form.email.trim(), form.password);
       setSession(response);
       router.push(DEFAULT_CHAT_ROUTE);
     } catch {
       setError('Registration failed. Make sure the FastAPI backend is running and try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  return { form, updateField, handleSubmit, error, isReady };
+  return { form, updateField, handleSubmit, error, isReady, isSubmitting };
 }
