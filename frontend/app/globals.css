@@ -436,6 +436,20 @@ input {
   background: rgba(184, 233, 120, 0.28);
 }
 
+.chat-scroll-region {
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+  scrollbar-width: thin;
+}
+
+.chat-scroll-region::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll-region::-webkit-scrollbar-thumb,
+:root[data-theme='dark'] .chat-scroll-region::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+}
+
 .skeleton {
   display: block;
   background-color: var(--skeleton);
