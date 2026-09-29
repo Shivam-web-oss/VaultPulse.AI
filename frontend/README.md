@@ -219,6 +219,8 @@ The frontend is maintained as a separate project from `backend/`; project-specif
 | Render grounded source links in assistant responses as clickable external links. | Let users open and verify live search citations. | `components/chat/Message.tsx` |
 | Show API status and safe provider error details when chat requests fail. | Diagnose live search quota, configuration, and backend errors without logging message contents. | `lib/api.ts`, `hooks/useChat.ts` |
 | Prevent horizontal overflow in message history and use a neutral vertical scrollbar. | Remove the green horizontal bar above the composer while keeping long conversations scrollable. | `app/chat/[conversationId]/page.tsx`, `components/chat/Message.tsx`, `app/globals.css` |
+| Send a stable client message ID for initial sends and retries. | Let the backend recognize retries and avoid rendering duplicate persisted messages. | `hooks/useChat.ts`, `lib/chatApi.ts` |
+| Add conversation row actions for rename, delete, and disabled share with a “Coming soon” hover hint. | Let users manage their own chat history from the sidebar. | `components/layout/Sidebar.tsx`, `hooks/useConversation.ts`, `lib/chatApi.ts`, `app/chat/[conversationId]/page.tsx` |
 | Load a selected conversation's message detail after listing account-owned conversations, and reload/clear chat state when the signed-in account changes. | Restore persisted history after sign-out/sign-in while keeping each account's conversations separate. | `hooks/useConversation.ts`, `hooks/useChat.ts` |
 
 ## Validation

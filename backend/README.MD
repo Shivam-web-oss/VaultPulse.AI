@@ -93,6 +93,7 @@ Pydantic schemas reject whitespace-only messages, prompts, and titles, normalize
 
 ### 2026-09-29
 
+| Added optional client message IDs with a unique per-conversation, per-role index so retries do not create duplicate chat rows. | Provider failures occur after saving the user message; retrying should reuse that saved message. | `migrations/003_message_idempotency.sql`, `app/schemas/chat.py`, `app/services/conversation_service.py`, `app/routes/chat.py` |
 | Added the runtime date and time to chat system instructions, configurable with `APP_TIMEZONE`, and directed the model not to invent ungrounded current facts. | Prevent answers from presenting the model's training snapshot as today's date or fabricating time-sensitive statistics. | `app/services/chat_service.py`, `.env.example` |
 | Give default conversations a title from their first user message; retain owner-scoped history listing. | Make each account's sidebar history identifiable while preserving conversation ownership checks. | `app/services/conversation_service.py` |
 | Added a real source policy: explicit domain allow-list, robots.txt fetch/cache/enforcement, per-domain token-bucket rate limits. | Respect terms, access restrictions, and rate limits before any fetch. | `app/tools/source_policy.py`, `app/tools/fetcher.py` |

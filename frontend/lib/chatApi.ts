@@ -23,11 +23,11 @@ export async function getConversations() {
 export async function getConversation(id: string) {
   return conversationFromApi(await apiRequest<ApiConversation>(`/api/conversations/${id}`));
 }
-export async function sendMessage(conversationId: string, message: string) {
-  return messageFromApi(await apiRequest<ApiMessage>(`/api/chat/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ message }) }));
+export async function sendMessage(conversationId: string, message: string, clientMessageId: string) {
+  return messageFromApi(await apiRequest<ApiMessage>(`/api/chat/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ message, client_message_id: clientMessageId }) }));
 }
 export async function renameConversation(id: string, title: string) {
-  return apiRequest(`/api/conversations/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+  return apiRequest<{ id: string; title: string; created_at: string; updated_at: string }>(`/api/conversations/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
 }
 export async function deleteConversation(id: string) {
   return apiRequest(`/api/conversations/${id}`, { method: 'DELETE' });

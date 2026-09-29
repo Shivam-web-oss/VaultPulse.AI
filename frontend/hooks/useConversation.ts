@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
-import { createConversation, getConversation, getConversations } from '../lib/chatApi';
+import { createConversation, deleteConversation as deleteConversationRequest, getConversation, getConversations, renameConversation as renameConversationRequest } from '../lib/chatApi';
 import type { Conversation } from '../types/conversation';
 
 export function useConversation(initialConversationId?: string) {
@@ -117,7 +117,24 @@ export function useConversation(initialConversationId?: string) {
     }
   };
 
+  const renameConversation = async (conversationId: string, title: string) => {
+    const saved = await renameConversationRequest(conversationId, title);
+    setConversations((current) => current.map((item) => item.id === conversationId
+      ? { ...item, title: saved.title, updatedAt: saved.updated_at }
+      : item));
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    await deleteConversationRequest(conversationId);
+    const remaining = conversations.filter((item) => item.id !== conversationId);
+    setConversations(remaining);
+    if (selectedId === conversationId) {
+      if (remaining.length > 0) await openConversation(remaining[0].id);
+      else await newConversation();
+    }
+  };
+
   const retryLoad = () => setLoadAttempt((attempt) => attempt + 1);
 
-  return { conversations, setConversations, selectedId, setSelectedId, openConversation, active, newConversation, loading, loadError, retryLoad, creating, createError, detailLoading: detailLoadingId === selectedId, detailError };
+  return { conversations, setConversations, selectedId, setSelectedId, openConversation, renameConversation, deleteConversation, active, newConversation, loading, loadError, retryLoad, creating, createError, detailLoading: detailLoadingId === selectedId, detailError };
 }

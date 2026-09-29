@@ -19,13 +19,13 @@ def send_message(conversation_id: str, payload: MessageRequest, current_user: Au
         raise HTTPException(status_code=404, detail="Conversation not found")
     user_message = payload.message.strip()
     logger.info("chat.request conversation_id=%s user_id=%s message_length=%s", conversation_id, current_user.id, len(user_message))
-    conversation_service.add_message(conversation_id, current_user.id, "user", user_message)
+    conversation_service.add_message(conversation_id, current_user.id, "user", user_message, payload.client_message_id)
     try:
         reply = chat_service.generate_reply(user_message, document_service.search(current_user.id, user_message))
     except ChatProviderUnavailableError as error:
         logger.error("chat.provider_unavailable conversation_id=%s user_id=%s", conversation_id, current_user.id)
         raise HTTPException(status_code=503, detail=str(error)) from error
-    response = conversation_service.add_message(conversation_id, current_user.id, "assistant", reply)
+    response = conversation_service.add_message(conversation_id, current_user.id, "assistant", reply, payload.client_message_id)
     logger.info("chat.response conversation_id=%s user_id=%s response_length=%s", conversation_id, current_user.id, len(reply))
     return response
 

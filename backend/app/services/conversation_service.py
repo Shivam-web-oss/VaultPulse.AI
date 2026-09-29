@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+from uuid import UUID
 from uuid import uuid4
 
 from app.db import connection
@@ -48,13 +49,23 @@ class ConversationService:
     def _message_row(row: dict) -> dict:
         return {**row, "id": str(row["id"]), "created_at": row["created_at"].isoformat()}
 
-    def add_message(self, conversation_id: str, owner_id: str, role: str, content: str) -> MessageOut:
+    def add_message(self, conversation_id: str, owner_id: str, role: str, content: str, client_message_id: Optional[UUID] = None) -> MessageOut:
         message_id = str(uuid4())
         with connection() as conn:
             conversation = conn.execute("select id from conversations where id = %s and owner_id = %s", (conversation_id, owner_id)).fetchone()
             if conversation is None:
                 raise KeyError(conversation_id)
-            row = conn.execute("insert into messages (id, conversation_id, role, content) values (%s, %s, %s, %s) returning id, role, content, created_at", (message_id, conversation_id, role, content)).fetchone()
+            if client_message_id is None:
+                row = conn.execute("insert into messages (id, conversation_id, role, content) values (%s, %s, %s, %s) returning id, role, content, created_at", (message_id, conversation_id, role, content)).fetchone()
+            else:
+                row = conn.execute(
+                    """insert into messages (id, conversation_id, role, content, client_message_id)
+                       values (%s, %s, %s, %s, %s)
+                       on conflict (conversation_id, client_message_id, role) where client_message_id is not null
+                       do update set content = messages.content
+                       returning id, role, content, created_at""",
+                    (message_id, conversation_id, role, content, client_message_id),
+                ).fetchone()
             conn.execute(
                 """update conversations c
                    set title = case when c.title = 'New conversation' then coalesce(

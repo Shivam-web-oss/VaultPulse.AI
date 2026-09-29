@@ -14,15 +14,16 @@ export function useChat(initialConversationId?: string) {
   const [draftState, setDraftState] = useState({ accountId, value: '' });
   const [sending, setSending] = useState(false);
   const [errorState, setErrorState] = useState<{ accountId: string | null; value: string | null }>({ accountId, value: null });
-  const [retryState, setRetryState] = useState<{ accountId: string | null; value: string | null }>({ accountId, value: null });
+  const [retryState, setRetryState] = useState<{ accountId: string | null; value: string | null; clientMessageId: string | null }>({ accountId, value: null, clientMessageId: null });
   const draft = draftState.accountId === accountId ? draftState.value : '';
   const error = errorState.accountId === accountId ? errorState.value : null;
   const retryText = retryState.accountId === accountId ? retryState.value : null;
+  const retryMessageId = retryState.accountId === accountId ? retryState.clientMessageId : null;
   const setDraft = (value: string) => setDraftState({ accountId, value });
   const setError = (value: string | null) => setErrorState({ accountId, value });
-  const setRetryText = (value: string | null) => setRetryState({ accountId, value });
+  const setRetryText = (value: string | null, clientMessageId: string | null = null) => setRetryState({ accountId, value, clientMessageId });
 
-  const submitMessage = async (text: string, active: NonNullable<typeof conversation.active>, reuseOptimisticMessage: boolean) => {
+  const submitMessage = async (text: string, active: NonNullable<typeof conversation.active>, reuseOptimisticMessage: boolean, clientMessageId = crypto.randomUUID()) => {
     setError(null);
     const userMessage: Message | null = reuseOptimisticMessage ? null : { id: `local-${Date.now()}`, role: 'user', content: text, createdAt: new Date().toISOString() };
     if (userMessage) {
@@ -46,7 +47,7 @@ export function useChat(initialConversationId?: string) {
         conversation.setSelectedId(conversationId);
       }
 
-      const reply = await sendMessage(conversationId, text);
+      const reply = await sendMessage(conversationId, text, clientMessageId);
       conversation.setConversations((current) => current.map((item) => item.id === conversationId ? { ...item, messages: [...item.messages, reply] } : item));
       setRetryText(null);
       console.info('[chat] message exchange completed', { conversationId });
@@ -57,7 +58,7 @@ export function useChat(initialConversationId?: string) {
         : 'Could not reach the backend. Check that it is running and try again.';
       console.warn('[chat] message exchange failed', { conversationId, status, errorType: error instanceof Error ? error.name : 'UnknownError' });
       setError(message);
-      setRetryText(text);
+      setRetryText(text, clientMessageId);
       if (!reuseOptimisticMessage) setDraft(text);
     } finally {
       setSending(false);
@@ -68,14 +69,15 @@ export function useChat(initialConversationId?: string) {
     const { active } = conversation;
     const text = draft.trim();
     if (!active || !text || sending) return;
-    await submitMessage(text, active, retryText === text);
+    const isRetry = retryText === text;
+    await submitMessage(text, active, isRetry, isRetry && retryMessageId ? retryMessageId : crypto.randomUUID());
   };
 
   const retrySend = () => {
     const { active } = conversation;
     if (!active || !retryText || sending) return;
     setDraft('');
-    void submitMessage(retryText, active, true);
+    void submitMessage(retryText, active, true, retryMessageId ?? crypto.randomUUID());
   };
 
   const updateDraft = (value: string) => {

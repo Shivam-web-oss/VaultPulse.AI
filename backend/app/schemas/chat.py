@@ -1,8 +1,12 @@
+from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, Field, field_validator
 
 
 class MessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=20000)
+    client_message_id: Optional[UUID] = None
 
     @field_validator("message")
     @classmethod

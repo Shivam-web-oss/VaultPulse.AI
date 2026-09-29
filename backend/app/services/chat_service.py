@@ -134,7 +134,23 @@ class ChatService:
         try:
             with urlopen(request, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+        except HTTPError as error:
+            if error.code in {401, 403}:
+                detail = f"The AI provider rejected the API key or denied access (HTTP {error.code}). Verify the key and provider account."
+            elif error.code == 429:
+                detail = "The AI provider quota or rate limit was reached (HTTP 429). Check the provider plan and usage limits."
+            elif error.code in {400, 404}:
+                try:
+                    provider_error = json.loads(error.read().decode("utf-8"))
+                    detail = provider_error.get("message") or provider_error.get("error", {}).get("message")
+                except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                    detail = None
+                if not isinstance(detail, str) or not detail:
+                    detail = f"The AI provider rejected the model or endpoint (HTTP {error.code}). Check AI_MODEL and AI_PROVIDER_BASE_URL."
+            else:
+                detail = f"The AI provider returned HTTP {error.code}. Check provider status and configuration."
+            raise ChatProviderUnavailableError(detail[:500]) from error
+        except (URLError, TimeoutError, json.JSONDecodeError) as error:
             raise ChatProviderUnavailableError("The configured AI provider could not be reached") from error
 
         try:
