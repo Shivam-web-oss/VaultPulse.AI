@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import { createConversation, getConversation, getConversations } from '../lib/chatApi';
 import type { Conversation } from '../types/conversation';
@@ -15,9 +15,13 @@ export function useConversation(initialConversationId?: string) {
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestId = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const requestId = ++detailRequestId.current;
     const loadConversations = async () => {
       setConversations([]);
       setSelectedId(null);
@@ -50,6 +54,7 @@ export function useConversation(initialConversationId?: string) {
         }
         const selected = items.find((item) => item.id === initialConversationId) ?? items[0];
         const detail = await getConversation(selected.id);
+        if (cancelled || requestId !== detailRequestId.current) return;
         if (!cancelled) {
           setConversations(items.map((item) => item.id === detail.id ? detail : item));
           setSelectedId(detail.id);
@@ -78,6 +83,7 @@ export function useConversation(initialConversationId?: string) {
     if (creating) return;
     setCreating(true);
     setCreateError(null);
+    setDetailError(null);
     try {
       const conversation = await createConversation();
       setConversations((current) => [conversation, ...current]);
@@ -93,18 +99,25 @@ export function useConversation(initialConversationId?: string) {
 
   const openConversation = async (conversationId: string) => {
     if (!accountId) return;
-    setLoadError(null);
+    const requestId = ++detailRequestId.current;
+    setSelectedId(conversationId);
+    setDetailLoadingId(conversationId);
+    setDetailError(null);
     try {
       const detail = await getConversation(conversationId);
+      if (requestId !== detailRequestId.current) return;
       setConversations((current) => current.map((item) => item.id === detail.id ? detail : item));
       setSelectedId(detail.id);
     } catch {
+      if (requestId !== detailRequestId.current) return;
       console.error('[conversation] failed to load conversation detail', { accountId });
-      setLoadError('Unable to load this conversation. Check your connection and try again.');
+      setDetailError('Unable to load this conversation. Check your connection and try again.');
+    } finally {
+      if (requestId === detailRequestId.current) setDetailLoadingId(null);
     }
   };
 
   const retryLoad = () => setLoadAttempt((attempt) => attempt + 1);
 
-  return { conversations, setConversations, selectedId, setSelectedId, openConversation, active, newConversation, loading, loadError, retryLoad, creating, createError };
+  return { conversations, setConversations, selectedId, setSelectedId, openConversation, active, newConversation, loading, loadError, retryLoad, creating, createError, detailLoading: detailLoadingId === selectedId, detailError };
 }
