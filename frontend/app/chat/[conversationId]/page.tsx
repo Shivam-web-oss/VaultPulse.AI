@@ -16,13 +16,13 @@ import { ChatThreadSkeleton, ChatTypingIndicator, Skeleton } from '../../../comp
 
 export default function ConversationPage() {
 	const params = useParams<{ conversationId: string }>();
-	const { conversations, selectedId, setSelectedId, active, newConversation, draft, setDraft, sending, error, send, retrySend, loading, loadError, retryLoad, creating, createError } = useChat(params.conversationId);
+	const { conversations, selectedId, openConversation, active, newConversation, draft, setDraft, sending, error, send, retrySend, loading, loadError, retryLoad, creating, createError } = useChat(params.conversationId);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 
 	return (
 		<ProtectedRoute>
 			<main className="chat-shell flex h-dvh min-h-0 overflow-hidden text-slate-100">
-				<Sidebar open={sidebarOpen} conversations={conversations} selectedId={selectedId} onSelect={(id) => { setSelectedId(id); setSidebarOpen(false); }} onNew={newConversation} onClose={() => setSidebarOpen(false)} loading={loading} loadError={loadError} onRetryLoad={retryLoad} creating={creating} createError={createError} />
+				<Sidebar open={sidebarOpen} conversations={conversations} selectedId={selectedId} onSelect={(id) => { void openConversation(id); setSidebarOpen(false); }} onNew={newConversation} onClose={() => setSidebarOpen(false)} loading={loading} loadError={loadError} onRetryLoad={retryLoad} creating={creating} createError={createError} />
 				<section className="chat-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 					<div className="chat-mobile-header flex shrink-0 items-center justify-between border-b border-white/10 md:hidden">
 						<div className="flex items-center"><button type="button" title="Open sidebar" onClick={() => setSidebarOpen(true)} className="p-4 text-slate-300"><Menu size={19} /></button><BrandMark size={24} className="mr-2 rounded-md" /><span className="text-sm font-semibold">VaultPulse.AI</span></div>

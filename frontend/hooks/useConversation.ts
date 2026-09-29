@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createConversation, getConversations } from '../lib/chatApi';
+import { useAuthContext } from '../context/AuthContext';
+import { createConversation, getConversation, getConversations } from '../lib/chatApi';
 import type { Conversation } from '../types/conversation';
 
 export function useConversation(initialConversationId?: string) {
+  const { user } = useAuthContext();
+  const accountId = user?.id ?? null;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,18 +19,17 @@ export function useConversation(initialConversationId?: string) {
   useEffect(() => {
     let cancelled = false;
     const loadConversations = async () => {
+      setConversations([]);
+      setSelectedId(null);
       setLoading(true);
       setLoadError(null);
+      if (!accountId) {
+        setLoading(false);
+        return;
+      }
       try {
         const items = await getConversations();
-        console.info('[conversation] loaded', { count: items.length, requestedId: initialConversationId ?? null });
-        if (initialConversationId && items.some((item) => item.id === initialConversationId)) {
-          if (!cancelled) {
-            setConversations(items);
-            setSelectedId(initialConversationId);
-          }
-          return;
-        }
+        console.info('[conversation] loaded', { count: items.length, requestedId: initialConversationId ?? null, accountId });
         if (items.length === 0) {
           try {
             const conversation = await createConversation();
@@ -46,12 +48,14 @@ export function useConversation(initialConversationId?: string) {
           }
           return;
         }
+        const selected = items.find((item) => item.id === initialConversationId) ?? items[0];
+        const detail = await getConversation(selected.id);
         if (!cancelled) {
-          setConversations(items);
-          setSelectedId(items[0].id);
+          setConversations(items.map((item) => item.id === detail.id ? detail : item));
+          setSelectedId(detail.id);
         }
       } catch {
-        console.error('[conversation] failed to load conversations');
+        console.error('[conversation] failed to load conversations', { accountId });
         if (!cancelled) {
           setConversations([]);
           setSelectedId(null);
@@ -66,7 +70,7 @@ export function useConversation(initialConversationId?: string) {
     return () => {
       cancelled = true;
     };
-  }, [initialConversationId, loadAttempt]);
+  }, [accountId, initialConversationId, loadAttempt]);
 
   const active = conversations.find((item) => item.id === selectedId) ?? null;
 
@@ -87,7 +91,20 @@ export function useConversation(initialConversationId?: string) {
     }
   };
 
+  const openConversation = async (conversationId: string) => {
+    if (!accountId) return;
+    setLoadError(null);
+    try {
+      const detail = await getConversation(conversationId);
+      setConversations((current) => current.map((item) => item.id === detail.id ? detail : item));
+      setSelectedId(detail.id);
+    } catch {
+      console.error('[conversation] failed to load conversation detail', { accountId });
+      setLoadError('Unable to load this conversation. Check your connection and try again.');
+    }
+  };
+
   const retryLoad = () => setLoadAttempt((attempt) => attempt + 1);
 
-  return { conversations, setConversations, selectedId, setSelectedId, active, newConversation, loading, loadError, retryLoad, creating, createError };
+  return { conversations, setConversations, selectedId, setSelectedId, openConversation, active, newConversation, loading, loadError, retryLoad, creating, createError };
 }

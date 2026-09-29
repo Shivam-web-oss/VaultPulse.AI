@@ -1,16 +1,25 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthContext } from '../context/AuthContext';
 import { createConversation, sendMessage } from '../lib/chatApi';
 import { useConversation } from './useConversation';
 import type { Message } from '../types/chat';
 
 export function useChat(initialConversationId?: string) {
+  const { user } = useAuthContext();
+  const accountId = user?.id ?? null;
   const conversation = useConversation(initialConversationId);
-  const [draft, setDraft] = useState('');
+  const [draftState, setDraftState] = useState({ accountId, value: '' });
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryText, setRetryText] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ accountId: string | null; value: string | null }>({ accountId, value: null });
+  const [retryState, setRetryState] = useState<{ accountId: string | null; value: string | null }>({ accountId, value: null });
+  const draft = draftState.accountId === accountId ? draftState.value : '';
+  const error = errorState.accountId === accountId ? errorState.value : null;
+  const retryText = retryState.accountId === accountId ? retryState.value : null;
+  const setDraft = (value: string) => setDraftState({ accountId, value });
+  const setError = (value: string | null) => setErrorState({ accountId, value });
+  const setRetryText = (value: string | null) => setRetryState({ accountId, value });
 
   const submitMessage = async (text: string, active: NonNullable<typeof conversation.active>, reuseOptimisticMessage: boolean) => {
     setError(null);
