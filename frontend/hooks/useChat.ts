@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
+import { ApiRequestError } from '../lib/api';
 import { createConversation, sendMessage } from '../lib/chatApi';
 import { useConversation } from './useConversation';
 import type { Message } from '../types/chat';
@@ -49,9 +50,12 @@ export function useChat(initialConversationId?: string) {
       conversation.setConversations((current) => current.map((item) => item.id === conversationId ? { ...item, messages: [...item.messages, reply] } : item));
       setRetryText(null);
       console.info('[chat] message exchange completed', { conversationId });
-    } catch {
-      const message = 'The message could not be sent. Check your connection and try again.';
-      console.error('[chat] message exchange failed', { conversationId });
+    } catch (error) {
+      const status = error instanceof ApiRequestError ? error.status : undefined;
+      const message = error instanceof ApiRequestError
+        ? `Message failed (${status}): ${error.message}`
+        : 'Could not reach the backend. Check that it is running and try again.';
+      console.warn('[chat] message exchange failed', { conversationId, status, errorType: error instanceof Error ? error.name : 'UnknownError' });
       setError(message);
       setRetryText(text);
       if (!reuseOptimisticMessage) setDraft(text);

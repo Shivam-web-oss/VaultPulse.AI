@@ -216,6 +216,8 @@ The frontend is maintained as a separate project from `backend/`; project-specif
 | --- | --- | --- |
 | Show per-account previous chats by their first user message and make sidebar search functional. | Make conversation history recognizable and searchable without mixing accounts. | `components/layout/Sidebar.tsx`, `hooks/useChat.ts` |
 | Fade composer attachment, image, and microphone icons on hover and show a “Coming soon” tooltip. | Make upcoming composer actions clear and consistent. | `components/chat/MessageComposer.tsx` |
+| Render grounded source links in assistant responses as clickable external links. | Let users open and verify live search citations. | `components/chat/Message.tsx` |
+| Show API status and safe provider error details when chat requests fail. | Diagnose live search quota, configuration, and backend errors without logging message contents. | `lib/api.ts`, `hooks/useChat.ts` |
 | Load a selected conversation's message detail after listing account-owned conversations, and reload/clear chat state when the signed-in account changes. | Restore persisted history after sign-out/sign-in while keeping each account's conversations separate. | `hooks/useConversation.ts`, `hooks/useChat.ts` |
 
 ## Validation

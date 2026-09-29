@@ -4,9 +4,11 @@ import { MessageActions } from './MessageActions';
 
 function renderContent(content: string) {
   return content.split('\n').map((line, index) => {
-    const formatted = line.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, partIndex) => {
+    const formatted = line.split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).map((part, partIndex) => {
       if (part.startsWith('`') && part.endsWith('`')) return <code key={partIndex} className="chat-inline-code rounded bg-black/30 px-1.5 py-0.5 text-[#c8ef94]">{part.slice(1, -1)}</code>;
       if (part.startsWith('**') && part.endsWith('**')) return <strong key={partIndex}>{part.slice(2, -2)}</strong>;
+      const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (link) return <a key={partIndex} href={link[2]} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-[#c8ef94]">{link[1]}</a>;
       return part;
     });
     return <p key={index} className={index > 0 ? 'mt-2' : ''}>{formatted}</p>;

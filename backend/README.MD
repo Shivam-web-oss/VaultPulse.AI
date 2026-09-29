@@ -63,9 +63,11 @@ AI_PROVIDER=
 AI_PROVIDER_API_KEY=your-key
 AI_PROVIDER_BASE_URL=https://api.openai.com/v1/chat/completions
 AI_MODEL=gpt-4o-mini
+APP_TIMEZONE=Asia/Kolkata
+AI_LIVE_SEARCH_ENABLED=true
 ```
 
-A missing key or unreachable/incompatible endpoint returns `503`; the backend never creates a fabricated assistant response. Native provider keys that do not support the OpenAI-compatible format still require a provider-specific adapter.
+A missing key or unreachable/incompatible endpoint returns `503`; the backend never creates a fabricated assistant response. Chat requests include the current backend date and time in `APP_TIMEZONE` (default `Asia/Kolkata`) so the model does not fall back to a training snapshot. When `AI_PROVIDER_BASE_URL` uses `generativelanguage.googleapis.com`, chat uses Gemini's native Google Search grounding and includes returned source links in the answer. This uses the existing Gemini API key; set `AI_LIVE_SEARCH_ENABLED=false` to disable it. For other OpenAI-compatible providers, live web search is not enabled and the model must not invent current facts. Search grounding usage may incur provider charges.
 
 ## Validation And Logging
 
@@ -91,6 +93,7 @@ Pydantic schemas reject whitespace-only messages, prompts, and titles, normalize
 
 ### 2026-09-29
 
+| Added the runtime date and time to chat system instructions, configurable with `APP_TIMEZONE`, and directed the model not to invent ungrounded current facts. | Prevent answers from presenting the model's training snapshot as today's date or fabricating time-sensitive statistics. | `app/services/chat_service.py`, `.env.example` |
 | Give default conversations a title from their first user message; retain owner-scoped history listing. | Make each account's sidebar history identifiable while preserving conversation ownership checks. | `app/services/conversation_service.py` |
 | Added a real source policy: explicit domain allow-list, robots.txt fetch/cache/enforcement, per-domain token-bucket rate limits. | Respect terms, access restrictions, and rate limits before any fetch. | `app/tools/source_policy.py`, `app/tools/fetcher.py` |
 | Added over-fetch planning and count capping; clean search-term extraction from prompts. | Validation drops failing records, so plan raw volume above target and deliver exactly what was requested. | `app/ai/planner.py`, `app/ai/requirement_analyzer.py`, `app/workflow/executor.py` |
